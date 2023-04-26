@@ -33,12 +33,20 @@ enum ParamsMapErr {
 //     OneAtomTwoDomainIds(RuleAtom, [DomainId; 2]),
 // }
 
-struct Typing {
-    map: HashMap<(StatementIdx, VariableId), DomainId>,
+type Typing = HashMap<StatementIdx, RuleTyping>;
+
+#[derive(Default)]
+struct RuleTyping {
+    map: HashMap<VariableId, DomainId>,
 }
 enum CheckErr {
     ParamsMapErr(ParamsMapErr),
     UndeclaredDomainId { did: DomainId },
+    RuleTypingErr { sidx: StatementIdx, err: RuleTypingErr },
+}
+enum RuleTypingErr {
+    MultipleTypes { vid: VariableId, domains: [DomainId; 2] },
+    NoTypes { vid: VariableId },
 }
 
 impl Program {
@@ -52,7 +60,7 @@ impl Program {
             .collect()
     }
     pub fn check(&self) -> Result<Typing, CheckErr> {
-        // step 1: unique definitions
+        // step 1: no duplicate domain definitions
         let pm = self.new_params_map().map_err(CheckErr::ParamsMapErr)?;
 
         // step 2: all constructs are declared
@@ -62,8 +70,22 @@ impl Program {
             }
         }
 
-        // Ok(Info { pm, rule_infos })
-        todo!()
+        // step 3: unique_types
+        let t: Typing = self
+            .statements
+            .iter()
+            .enumerate()
+            .flat_map(|(sidx, statement)| {
+                statement.rule_typing(&pm).map(|x| {
+                    x.map(|x| (sidx, x)).map_err(|err| CheckErr::RuleTypingErr { sidx, err })
+                })
+            })
+            .collect::<Result<Typing, _>>()?;
+
+        // step 4: enumerability check
+        // TODO
+
+        Ok(t)
     }
     fn new_params_map(&self) -> Result<ParamsMap, ParamsMapErr> {
         let mut pm = ParamsMap::default();
@@ -122,9 +144,37 @@ impl Statement {
                 .flatten(),
         }
     }
+    fn rule_typing(&self, pm: &ParamsMap) -> Option<Result<RuleTyping, RuleTypingErr>> {
+        match self {
+            Statement::Rule { consequents, antecedents } => {
+                let mut rt = RuleTyping::default();
+                let mut vids = Default::default();
+                for ra in consequents.iter().chain(antecedents.iter().map(|lit| &lit.ra)) {
+                    ra.variables(&mut vids);
+                }
+                Some(if let Some(vid) = vids.iter().find(|&vid| !rt.map.contains_key(vid)) {
+                    Err(RuleTypingErr::NoTypes { vid: vid.clone() })
+                } else {
+                    Ok(rt)
+                })
+            }
+            _ => None,
+        }
+    }
 }
 
 impl RuleAtom {
+    fn variables(&self, vids: &mut HashSet<VariableId>) {
+        match self {
+            RuleAtom::IntConst { .. } | RuleAtom::StrConst { .. } => {}
+            RuleAtom::Variable { vid } => drop(vids.insert(vid.clone())),
+            RuleAtom::Construct { args, .. } => {
+                for arg in args {
+                    arg.variables(vids)
+                }
+            }
+        }
+    }
     fn undeclared_domain_id(&self, declarations: &HashSet<DomainId>) -> Option<DomainId> {
         match self {
             RuleAtom::Construct { did, args } => {
@@ -137,49 +187,3 @@ impl RuleAtom {
         }
     }
 }
-
-// impl Statement {
-//     fn rule_info(&self, pm: &ParamsMap) -> RuleInfo {
-//         let mut ri = RuleInfo::default();
-//         match self {
-//             Statement::Rule { consequents, antecedents } => {
-//                     ra.analyze_types(pm, ctx, &mut ri, false)
-//                 }
-//                 for RuleLiteral { sign, ra } in antecedents {
-//                     match sign {
-//                         Sign::Pos => {}
-//                         Sign::Neg => {}
-//                     }
-//                 }
-//             }
-//             _ => {}
-//         }
-//         ri
-//     }
-// }
-// impl RuleInfo {
-//     fn add_domain_mapping(&mut self, ra: RuleAtom, did: DomainId) {
-//         self.ra_domains.entry(ra).or_default().insert(did);
-//     }
-// }
-// impl DomainId {
-//     fn int() -> Self {
-//         Self("int".into())
-//     }
-//     fn str() -> Self {
-//         Self("str".into())
-//     }
-// }
-// impl RuleAtom {
-//     fn primitive(&self) -> bool {}
-//     fn analyze_types(&self, pm: &ParamsMap, ri: &mut RuleInfo, within_enumerable_atom: bool) {
-//         match self {
-//             RuleAtom::Var { vid } => ri.variables.insert(vid.clone()),
-//             RuleAtom::IntConst { c } => ri.add_domain_mapping(self.clone(), DomainId::int()),
-//             RuleAtom::StrConst { c } => ri.add_domain_mapping(self.clone(), DomainId::str()),
-//             RuleAtom::Construct { did, args } => {
-//                 ri.add_domain_mapping(self.clone(), did.clone());
-//             }
-//         }
-//     }
-// }

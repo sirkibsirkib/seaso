@@ -1,7 +1,8 @@
 mod ast;
-mod typing;
+mod parse;
+mod statics;
 mod well_formedness;
 
 fn main() {
-    println!("Hello, world!");
+    parse::test();
 }
