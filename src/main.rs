@@ -4,10 +4,16 @@ mod statics;
 
 fn main() -> Result<(), ()> {
     let p = parse::program(
-        "defn x(int). y(x,x,x). coolint(int).
-        rule y(A,x(B),x(B)) :- x(B), A, x(C).",
+        "
+        seal x. emit x.
+        defn x(int). y(x,x,x). coolint(int).
+        rule y(A,x(B),x(B)) :- x(B), A, x(C).
+        ",
     );
     println!("{:#?}", p);
-    eprintln!("{:?}", p.map_err(drop)?.1.check());
+    let p = p.map_err(drop)?.1;
+    let t = p.check();
+    eprintln!("{:?}", t);
+    eprintln!("{:?}", p.seal_break());
     Ok(())
 }

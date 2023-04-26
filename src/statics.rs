@@ -13,6 +13,8 @@ pub enum ParamsMapErr {
     DuplicateDefn([StatementIdx; 2]),
 }
 
+type FirstSealedAt = HashMap<DomainId, StatementIdx>;
+
 type Typing = HashMap<StatementIdx, RuleTyping>;
 
 #[derive(Debug, Default)]
@@ -32,6 +34,12 @@ pub enum RuleTypingErr {
     NoTypes { vid: VariableId },
     WrongArity { did: DomainId, params: usize, args: usize },
     VariableNotEnumerable { vid: VariableId },
+}
+
+#[derive(Debug)]
+pub struct SealBreak {
+    sealed: StatementIdx,
+    other: StatementIdx,
 }
 
 impl Program {
@@ -61,6 +69,34 @@ impl Program {
 
         Ok(t)
     }
+
+    pub fn seal_break(&self) -> Option<SealBreak> {
+        let mut sfa = FirstSealedAt::default();
+        for (sidx, statement) in self.statements.iter().enumerate() {
+            match statement {
+                Statement::Seal { did } => {
+                    sfa.insert(did.clone(), sidx);
+                }
+                Statement::Rule { consequents, .. } => {
+                    for consequent in consequents {
+                        if let RuleAtom::Construct { did, .. } = consequent {
+                            if let Some(&s_sidx) = sfa.get(did) {
+                                return Some(SealBreak { sealed: s_sidx, other: sidx });
+                            }
+                        }
+                    }
+                }
+                Statement::Emit { did } => {
+                    if let Some(&s_sidx) = sfa.get(did) {
+                        return Some(SealBreak { sealed: s_sidx, other: sidx });
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
     fn new_params_map(&self) -> Result<ParamsMap, ParamsMapErr> {
         let mut pm = ParamsMap::default();
         for (sidx, statement) in self.statements.iter().enumerate() {
