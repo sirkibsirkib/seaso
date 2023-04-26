@@ -22,7 +22,7 @@ pub struct RuleTyping {
 #[derive(Debug)]
 pub enum CheckErr {
     ParamsMapErr(ParamsMapErr),
-    UndeclaredDomainId { sidx: StatementIdx, did: DomainId },
+    UndefinedConstructor { sidx: StatementIdx, did: DomainId },
     RuleTypingErr { sidx: StatementIdx, err: RuleTypingErr },
 }
 #[derive(Debug)]
@@ -35,15 +35,6 @@ pub enum RuleTypingErr {
 }
 
 impl Program {
-    // fn declared_domain_ids(&self) -> HashSet<DomainId> {
-    //     self.statements
-    //         .iter()
-    //         .filter_map(|statement| match statement {
-    //             Statement::Decl { did } | Statement::Defn { did, .. } => Some(did.clone()),
-    //             _ => None,
-    //         })
-    //         .collect()
-    // }
     pub fn check(&self) -> Result<Typing, CheckErr> {
         // step 1: no duplicate domain definitions
         let pm = self.new_params_map().map_err(CheckErr::ParamsMapErr)?;
@@ -52,7 +43,7 @@ impl Program {
         let declarations = self.declarations();
         for (sidx, statement) in self.statements.iter().enumerate() {
             if let Some(did) = statement.undeclared_domain_id(&declarations) {
-                return Err(CheckErr::UndeclaredDomainId { sidx, did });
+                return Err(CheckErr::UndefinedConstructor { sidx, did });
             }
         }
 
@@ -72,11 +63,11 @@ impl Program {
     }
     fn new_params_map(&self) -> Result<ParamsMap, ParamsMapErr> {
         let mut pm = ParamsMap::default();
-        for (statement_idx, statement) in self.statements.iter().enumerate() {
+        for (sidx, statement) in self.statements.iter().enumerate() {
             if let Statement::Defn { did, params } = statement {
-                let value = (statement_idx, params.clone());
+                let value = (sidx, params.clone());
                 if let Some(previous) = pm.insert(did.clone(), value) {
-                    return Err(ParamsMapErr::DuplicateDefn([previous.0, statement_idx]));
+                    return Err(ParamsMapErr::DuplicateDefn([previous.0, sidx]));
                 }
             }
         }
