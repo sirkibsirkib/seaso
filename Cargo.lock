@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "poop_rs"
+name = "seal_dsl_rs"
 version = "0.1.0"

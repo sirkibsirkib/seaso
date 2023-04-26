@@ -1,14 +1,14 @@
 pub type StatementIdx = usize;
 
 #[derive(Clone, PartialEq, Hash, Eq)]
-pub struct DomainId(String);
+pub struct DomainId(pub String);
 
-#[derive(PartialEq, Hash, Eq)]
+#[derive(Clone, PartialEq, Hash, Eq)]
 pub struct VariableId(String);
 
-#[derive(PartialEq, Hash, Eq)]
+#[derive(Clone, PartialEq, Hash, Eq)]
 pub enum RuleAtom {
-    Var { vid: VariableId },
+    Variable { vid: VariableId },
     IntConst { c: i64 },
     StrConst { c: String },
     Construct { did: DomainId, args: Vec<RuleAtom> },
@@ -25,6 +25,7 @@ pub enum Statement {
     Emit { did: DomainId },
 }
 
+#[derive(Clone)]
 pub enum Sign {
     Pos,
     Neg,
