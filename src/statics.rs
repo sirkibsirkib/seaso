@@ -31,6 +31,7 @@ pub enum RuleTypingErr {
     MultipleTypes { vid: VariableId, domains: [DomainId; 2] },
     NoTypes { vid: VariableId },
     WrongArity { did: DomainId, params: usize, args: usize },
+    VariableNotEnumerable { vid: VariableId },
 }
 
 impl Program {
@@ -55,7 +56,7 @@ impl Program {
             }
         }
 
-        // step 3: unique_types
+        // step 3: check rules and return variable types
         let t: Typing = self
             .statements
             .iter()
@@ -66,9 +67,6 @@ impl Program {
                 })
             })
             .collect::<Result<Typing, _>>()?;
-
-        // step 4: enumerability check
-        // TODO
 
         Ok(t)
     }
@@ -92,6 +90,15 @@ impl Program {
                 _ => None,
             })
             .collect()
+    }
+}
+
+impl DomainId {
+    fn is_primitive(&self) -> bool {
+        match self.0.as_ref() {
+            "int" | "str" => true,
+            _ => false,
+        }
     }
 }
 
@@ -128,7 +135,16 @@ impl Statement {
                 Some(if let Some(vid) = vids.iter().find(|&vid| !rt.map.contains_key(vid)) {
                     Err(RuleTypingErr::NoTypes { vid: vid.clone() })
                 } else {
-                    Ok(rt)
+                    // enumerability check
+                    let mut enumerable = HashSet::default();
+                    for antecedent in antecedents {
+                        antecedent.variables_if_enumerable(&rt, &mut enumerable);
+                    }
+                    if let Some(vid) = vids.difference(&enumerable).next() {
+                        Err(RuleTypingErr::VariableNotEnumerable { vid: vid.clone() })
+                    } else {
+                        Ok(rt)
+                    }
                 })
             }
             _ => None,
@@ -150,7 +166,6 @@ impl RuleAtom {
                     });
                 }
                 for (arg, param) in args.iter().zip(params.iter()) {
-                    //todo
                     if let RuleAtom::Variable { vid } = arg {
                         match rt.map.insert(vid.clone(), param.clone()) {
                             Some(param2) if param != &param2 => {
@@ -191,6 +206,27 @@ impl RuleAtom {
                 args.iter().map(|ra| ra.undeclared_domain_id(declarations)).next().flatten()
             }
             _ => None,
+        }
+    }
+}
+
+impl RuleLiteral {
+    fn variables_if_enumerable(&self, rt: &RuleTyping, variables: &mut HashSet<VariableId>) {
+        if self.sign == Sign::Pos {
+            match &self.ra {
+                RuleAtom::Construct { did, args } if !did.is_primitive() => {
+                    for arg in args {
+                        arg.variables(variables)
+                    }
+                }
+                RuleAtom::Variable { vid } => {
+                    let did = rt.map.get(vid).expect("Checked before, I think");
+                    if !did.is_primitive() {
+                        self.ra.variables(variables)
+                    }
+                }
+                _ => {}
+            }
         }
     }
 }

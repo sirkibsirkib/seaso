@@ -28,7 +28,7 @@ pub enum Statement {
     Emit { did: DomainId },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Sign {
     Pos,
     Neg,

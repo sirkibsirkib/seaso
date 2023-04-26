@@ -14,6 +14,8 @@ use nom::{
     IResult,
 };
 
+////////// PARSER COMBINATORS //////////
+
 fn wsl<'a, F: 'a, O, E: ParseError<&'a str>>(
     inner: F,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
@@ -58,6 +60,8 @@ where
 {
     delimited(ws(tag("(")), commasep(inner), ws(tag(")")))
 }
+
+////////// PARSERS //////////
 
 pub fn program(mut i: &str) -> IResult<&str, Program> {
     let mut program = Program::default();
