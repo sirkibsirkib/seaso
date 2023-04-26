@@ -4,7 +4,7 @@ pub type StatementIdx = usize;
 pub struct DomainId(pub String);
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
-pub struct VariableId(String);
+pub struct VariableId(pub String);
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum RuleAtom {

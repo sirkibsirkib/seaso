@@ -1,7 +1,10 @@
 use crate::ast::*;
+use nom::character::complete::i64 as nomi64;
 use nom::character::complete::multispace0;
 use nom::combinator::map as nommap;
+use nom::combinator::verify;
 use nom::error::ParseError;
+use nom::multi::many1;
 use nom::multi::separated_list0;
 use nom::sequence::delimited;
 use nom::sequence::preceded;
@@ -24,6 +27,8 @@ fn program(mut i: &str) -> IResult<&str, Program> {
         let (i2, statements) = alt((
             preceded(ws(tag("decl")), many0(terminated(decl, ws(tag("."))))),
             preceded(ws(tag("defn")), many0(terminated(defn, ws(tag("."))))),
+            preceded(ws(tag("seal")), many0(terminated(seal, ws(tag("."))))),
+            preceded(ws(tag("emit")), many0(terminated(emit, ws(tag("."))))),
         ))(i)?;
         i = i2;
         program.statements.extend(statements)
@@ -32,8 +37,17 @@ fn program(mut i: &str) -> IResult<&str, Program> {
 }
 
 fn domain_id(i: &str) -> IResult<&str, DomainId> {
-    let (i, ident) = ws(alpha1)(i)?;
+    let (i, ident) = verify(ws(alpha1), |s: &str| {
+        s.chars().filter(|c: &char| c.is_lowercase()).next().is_some()
+    })(i)?;
     Ok((i, DomainId(ident.to_owned())))
+}
+
+fn variable_id(i: &str) -> IResult<&str, VariableId> {
+    let (i, ident) = verify(ws(alpha1), |s: &str| {
+        s.chars().filter(|c: &char| c.is_uppercase()).next().is_some()
+    })(i)?;
+    Ok((i, VariableId(ident.to_owned())))
 }
 
 fn decl(i: &str) -> IResult<&str, Statement> {
@@ -47,17 +61,38 @@ fn defn(i: &str) -> IResult<&str, Statement> {
     Ok((i, Statement::Defn { did, params }))
 }
 
+fn variable(i: &str) -> IResult<&str, RuleAtom> {
+    nommap(variable_id, |vid| RuleAtom::Variable { vid })(i)
+}
+
+fn int_const(i: &str) -> IResult<&str, RuleAtom> {
+    nommap(ws(nomi64), |c| RuleAtom::IntConst { c })(i)
+}
+
+fn str_cosnt(i: &str) -> IResult<&str, RuleAtom> {}
+
+fn construct(i: &str) -> IResult<&str, RuleAtom> {}
+
+fn rule_atom(i: &str) -> IResult<&str, RuleAtom> {
+    alt((variable, int_const, str_cosnt, construct))(i)
+}
+fn rule_literal(i: &str) -> IResult<&str, RuleLiteral> {
+    todo!()
+}
+
 fn rule(i: &str) -> IResult<&str, Statement> {
-    // tag("X")(i)
+    let (i, consequents) = many1(rule_atom)(i)?;
+    let (i, maybe_antecedents) =
+        alt((nommap(many0(rule_literal), |x| Some(x)), nommap(multispace0, |x| None)))(i)?;
     todo!()
 }
 
 fn emit(i: &str) -> IResult<&str, Statement> {
-    todo!()
+    nommap(domain_id, |did| Statement::Emit { did })(i)
 }
 
 fn seal(i: &str) -> IResult<&str, Statement> {
-    todo!()
+    nommap(domain_id, |did| Statement::Seal { did })(i)
 }
 
 // fn parse_program(mut i: &str) -> Result<(&str, Program), &str> {
@@ -88,6 +123,6 @@ fn seal(i: &str) -> IResult<&str, Statement> {
 // }
 
 pub fn test() {
-    let p = program("decl     bim. bop. bow. defn whee(wah,wang). woo().");
+    let p = program("decl     bim. bop. bow. defn whee(wah,wang). woo(). seal woo.");
     println!("{:#?}", p);
 }
