@@ -59,7 +59,7 @@ where
     delimited(ws(tag("(")), commasep(inner), ws(tag(")")))
 }
 
-fn program(mut i: &str) -> IResult<&str, Program> {
+pub fn program(mut i: &str) -> IResult<&str, Program> {
     let mut program = Program::default();
     while !i.is_empty() {
         let (i2, statements) = alt((
@@ -143,9 +143,4 @@ fn emit(i: &str) -> IResult<&str, Statement> {
 
 fn seal(i: &str) -> IResult<&str, Statement> {
     nommap(domain_id, |did| Statement::Seal { did })(i)
-}
-
-pub fn test() {
-    let p = program("rule x(2,3,Yhee,y(3,4)) :- 2, !x(1,1).");
-    println!("{:#?}", p);
 }

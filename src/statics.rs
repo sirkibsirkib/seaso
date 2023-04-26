@@ -1,72 +1,57 @@
 use crate::ast::*;
 use std::collections::{HashMap, HashSet};
 
-// pub struct Info {
-//     pm: ParamsMap,
-//     rule_infos: HashMap<StatementIdx, RuleInfo>,
+// enum DeconstructionErr {
+//     UndefinedConstructor { did: DomainId },
+//     ArgsParamsArityMismatch { did: DomainId, args: usize, params: usize },
 // }
-
-// #[derive(Default)]
-// pub struct RuleInfo {
-//     variables: HashSet<VariableId>,
-//     ra_domains: HashMap<RuleAtom, HashSet<DomainId>>,
-//     failed_desonstructions: Vec<DeconstructionErr>,
-// }
-
-enum DeconstructionErr {
-    UndefinedConstructor { did: DomainId },
-    ArgsParamsArityMismatch { did: DomainId, args: usize, params: usize },
-}
-
-// type Typemap = HashMap<TypeMapped, DomainId>;
 
 type ParamsMap = HashMap<DomainId, (StatementIdx, Vec<DomainId>)>;
 
-enum ParamsMapErr {
+#[derive(Debug)]
+pub enum ParamsMapErr {
     DuplicateDefn([StatementIdx; 2]),
 }
-// enum InfoErr {
-//     ParamsMapErr(ParamsMapErr),
-//     RuleInfoErr(StatementIdx,RuleInfoErr)
-// }
-// enum RuleInfoErr {
-//     OneAtomTwoDomainIds(RuleAtom, [DomainId; 2]),
-// }
 
 type Typing = HashMap<StatementIdx, RuleTyping>;
 
-#[derive(Default)]
-struct RuleTyping {
+#[derive(Debug, Default)]
+pub struct RuleTyping {
     map: HashMap<VariableId, DomainId>,
 }
-enum CheckErr {
+#[derive(Debug)]
+pub enum CheckErr {
     ParamsMapErr(ParamsMapErr),
-    UndeclaredDomainId { did: DomainId },
+    UndeclaredDomainId { sidx: StatementIdx, did: DomainId },
     RuleTypingErr { sidx: StatementIdx, err: RuleTypingErr },
 }
-enum RuleTypingErr {
+#[derive(Debug)]
+pub enum RuleTypingErr {
+    UndefinedConstructor { did: DomainId },
     MultipleTypes { vid: VariableId, domains: [DomainId; 2] },
     NoTypes { vid: VariableId },
+    WrongArity { did: DomainId, params: usize, args: usize },
 }
 
 impl Program {
-    pub fn declared_domain_ids(&self) -> HashSet<DomainId> {
-        self.statements
-            .iter()
-            .filter_map(|statement| match statement {
-                Statement::Decl { did } | Statement::Defn { did, .. } => Some(did.clone()),
-                _ => None,
-            })
-            .collect()
-    }
+    // fn declared_domain_ids(&self) -> HashSet<DomainId> {
+    //     self.statements
+    //         .iter()
+    //         .filter_map(|statement| match statement {
+    //             Statement::Decl { did } | Statement::Defn { did, .. } => Some(did.clone()),
+    //             _ => None,
+    //         })
+    //         .collect()
+    // }
     pub fn check(&self) -> Result<Typing, CheckErr> {
         // step 1: no duplicate domain definitions
         let pm = self.new_params_map().map_err(CheckErr::ParamsMapErr)?;
 
         // step 2: all constructs are declared
-        for (sid, statement) in self.statements.iter().enumerate() {
-            if let Some(did) = self.undeclared_domain_id() {
-                return Err(CheckErr::UndeclaredDomainId { did });
+        let declarations = self.declarations();
+        for (sidx, statement) in self.statements.iter().enumerate() {
+            if let Some(did) = statement.undeclared_domain_id(&declarations) {
+                return Err(CheckErr::UndeclaredDomainId { sidx, did });
             }
         }
 
@@ -108,21 +93,6 @@ impl Program {
             })
             .collect()
     }
-    fn undeclared_domain_id(&self) -> Option<DomainId> {
-        let declarations = self.declarations();
-        self.statements
-            .iter()
-            .map(|statement| statement.undeclared_domain_id(&declarations))
-            .next()
-            .flatten()
-    }
-}
-
-#[derive(Clone)]
-enum RuleAtomInfoContext {
-    ConsequentRoot,
-    EnumerableAntecedent,
-    NonEnumerableAntecedent,
 }
 
 impl Statement {
@@ -151,6 +121,9 @@ impl Statement {
                 let mut vids = Default::default();
                 for ra in consequents.iter().chain(antecedents.iter().map(|lit| &lit.ra)) {
                     ra.variables(&mut vids);
+                    if let Err(err) = ra.typing(pm, &mut rt) {
+                        return Some(Err(err));
+                    }
                 }
                 Some(if let Some(vid) = vids.iter().find(|&vid| !rt.map.contains_key(vid)) {
                     Err(RuleTypingErr::NoTypes { vid: vid.clone() })
@@ -164,6 +137,40 @@ impl Statement {
 }
 
 impl RuleAtom {
+    fn typing(&self, pm: &ParamsMap, rt: &mut RuleTyping) -> Result<(), RuleTypingErr> {
+        match self {
+            RuleAtom::Construct { did, args } => {
+                let (_defn_sidx, params) =
+                    pm.get(did).ok_or(RuleTypingErr::UndefinedConstructor { did: did.clone() })?;
+                if params.len() != args.len() {
+                    return Err(RuleTypingErr::WrongArity {
+                        did: did.clone(),
+                        params: params.len(),
+                        args: args.len(),
+                    });
+                }
+                for (arg, param) in args.iter().zip(params.iter()) {
+                    //todo
+                    if let RuleAtom::Variable { vid } = arg {
+                        match rt.map.insert(vid.clone(), param.clone()) {
+                            Some(param2) if param != &param2 => {
+                                return Err(RuleTypingErr::MultipleTypes {
+                                    vid: vid.clone(),
+                                    domains: [param.clone(), param2.clone()],
+                                });
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                for arg in args {
+                    arg.typing(pm, rt)?
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
     fn variables(&self, vids: &mut HashSet<VariableId>) {
         match self {
             RuleAtom::IntConst { .. } | RuleAtom::StrConst { .. } => {}
