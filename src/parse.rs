@@ -96,6 +96,13 @@ fn variable_id(i: &str) -> IResult<&str, VariableId> {
 fn decl(i: &str) -> IResult<&str, Statement> {
     nommap(domain_id, |did| Statement::Decl { did })(i)
 }
+fn emit(i: &str) -> IResult<&str, Statement> {
+    nommap(domain_id, |did| Statement::Emit { did })(i)
+}
+
+fn seal(i: &str) -> IResult<&str, Statement> {
+    nommap(domain_id, |did| Statement::Seal { did })(i)
+}
 
 fn defn(i: &str) -> IResult<&str, Statement> {
     let (i, did) = domain_id(i)?;
@@ -139,12 +146,4 @@ fn rule(i: &str) -> IResult<&str, Statement> {
         nommap(multispace0, |_| Vec::default()),
     ))(i)?;
     Ok((i, Statement::Rule { consequents, antecedents }))
-}
-
-fn emit(i: &str) -> IResult<&str, Statement> {
-    nommap(domain_id, |did| Statement::Emit { did })(i)
-}
-
-fn seal(i: &str) -> IResult<&str, Statement> {
-    nommap(domain_id, |did| Statement::Seal { did })(i)
 }

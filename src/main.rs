@@ -1,4 +1,5 @@
 mod ast;
+mod dynamics;
 mod parse;
 mod statics;
 

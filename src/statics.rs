@@ -38,8 +38,8 @@ pub enum RuleTypingErr {
 
 #[derive(Debug)]
 pub struct SealBreak {
-    sealed: StatementIdx,
-    other: StatementIdx,
+    pub sealed: StatementIdx,
+    pub modified: StatementIdx,
 }
 
 impl Program {
@@ -81,14 +81,14 @@ impl Program {
                     for consequent in consequents {
                         if let RuleAtom::Construct { did, .. } = consequent {
                             if let Some(&s_sidx) = sfa.get(did) {
-                                return Some(SealBreak { sealed: s_sidx, other: sidx });
+                                return Some(SealBreak { sealed: s_sidx, modified: sidx });
                             }
                         }
                     }
                 }
                 Statement::Emit { did } => {
                     if let Some(&s_sidx) = sfa.get(did) {
-                        return Some(SealBreak { sealed: s_sidx, other: sidx });
+                        return Some(SealBreak { sealed: s_sidx, modified: sidx });
                     }
                 }
                 _ => {}
