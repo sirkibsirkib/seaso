@@ -61,7 +61,7 @@ where
     delimited(ws(tag("(")), commasep(inner), ws(tag(")")))
 }
 
-////////// PARSERS //////////
+////////// STATEMENT PARSERS //////////
 
 pub fn program(mut i: &str) -> IResult<&str, Program> {
     let mut program = Program::default();
@@ -79,20 +79,6 @@ pub fn program(mut i: &str) -> IResult<&str, Program> {
     Ok((i, program))
 }
 
-fn id_suffix(i: &str) -> IResult<&str, &str> {
-    recognize(many0_count(alt((tag("_"), alpha1))))(i)
-}
-
-fn domain_id(i: &str) -> IResult<&str, DomainId> {
-    let (i, ident) = ws(recognize(pair(satisfy(|c| c.is_ascii_lowercase()), id_suffix)))(i)?;
-    Ok((i, DomainId(ident.to_owned())))
-}
-
-fn variable_id(i: &str) -> IResult<&str, VariableId> {
-    let (i, ident) = ws(recognize(pair(satisfy(|c| c.is_ascii_uppercase()), id_suffix)))(i)?;
-    Ok((i, VariableId(ident.to_owned())))
-}
-
 fn decl(i: &str) -> IResult<&str, Statement> {
     nommap(domain_id, |did| Statement::Decl { did })(i)
 }
@@ -108,6 +94,31 @@ fn defn(i: &str) -> IResult<&str, Statement> {
     let (i, did) = domain_id(i)?;
     let (i, params) = list(domain_id)(i)?;
     Ok((i, Statement::Defn { did, params }))
+}
+
+fn rule(i: &str) -> IResult<&str, Statement> {
+    let (i, consequents) = commasep(rule_atom)(i)?;
+    let (i, antecedents) = alt((
+        preceded(ws(tag(":-")), commasep(rule_literal)),
+        nommap(multispace0, |_| Vec::default()),
+    ))(i)?;
+    Ok((i, Statement::Rule { consequents, antecedents }))
+}
+
+////////// (SUB)EXPRESSION PARSERS //////////
+
+fn id_suffix(i: &str) -> IResult<&str, &str> {
+    recognize(many0_count(alt((tag("_"), alpha1))))(i)
+}
+
+fn domain_id(i: &str) -> IResult<&str, DomainId> {
+    let (i, ident) = ws(recognize(pair(satisfy(|c| c.is_ascii_lowercase()), id_suffix)))(i)?;
+    Ok((i, DomainId(ident.to_owned())))
+}
+
+fn variable_id(i: &str) -> IResult<&str, VariableId> {
+    let (i, ident) = ws(recognize(pair(satisfy(|c| c.is_ascii_uppercase()), id_suffix)))(i)?;
+    Ok((i, VariableId(ident.to_owned())))
 }
 
 fn variable(i: &str) -> IResult<&str, RuleAtom> {
@@ -137,13 +148,4 @@ fn rule_literal(i: &str) -> IResult<&str, RuleLiteral> {
     let (i, (excl, ra)) = pair(opt(ws(tag("!"))), rule_atom)(i)?;
     let sign = if excl.is_some() { Sign::Neg } else { Sign::Pos };
     Ok((i, RuleLiteral { sign, ra }))
-}
-
-fn rule(i: &str) -> IResult<&str, Statement> {
-    let (i, consequents) = commasep(rule_atom)(i)?;
-    let (i, antecedents) = alt((
-        preceded(ws(tag(":-")), commasep(rule_literal)),
-        nommap(multispace0, |_| Vec::default()),
-    ))(i)?;
-    Ok((i, Statement::Rule { consequents, antecedents }))
 }
