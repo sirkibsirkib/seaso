@@ -90,7 +90,12 @@ fn enumerate_rule(
             }
         }
         [rl, tail @ ..] => {
-            todo!()
+            let mut variables = HashSet::<VariableId>::default();
+            if let Some(did) = rl.is_enumerable_in(v2d) {
+                for ra in pos_knowledge.map.entry(did).or_default().iter() {
+                    todo!()
+                }
+            }
         }
     }
 }

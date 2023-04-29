@@ -231,16 +231,20 @@ impl RuleAtom {
 }
 
 impl RuleLiteral {
-    fn is_enumerable(&self, v2d: &VidToDid) -> bool {
-        self.sign == Sign::Pos && {
-            match &self.ra {
+    pub fn is_enumerable_in(&self, v2d: &VidToDid) -> Option<DomainId> {
+        if self.sign == Sign::Pos {
+            let did = match &self.ra {
                 RuleAtom::Construct { did, .. } => did,
                 RuleAtom::Variable { vid } => v2d.get(vid).expect("Checked before, I think"),
-                _ => return false,
+                _ => return None,
+            };
+            if !did.is_primitive() {
+                return Some(did.clone());
             }
-            .is_primitive()
-        }
+        };
+        None
     }
+    // NOTE: assumes `v2d` covers all occurring variables
     fn variables_if_enumerable(&self, v2d: &VidToDid, variables: &mut HashSet<VariableId>) {
         if self.sign == Sign::Pos {
             match &self.ra {
