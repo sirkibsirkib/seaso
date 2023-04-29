@@ -23,9 +23,15 @@ pub struct Program {
 pub enum Statement {
     Decl { did: DomainId },
     Defn { did: DomainId, params: Vec<DomainId> },
-    Rule { consequents: Vec<RuleAtom>, antecedents: Vec<RuleLiteral> },
+    Rule(Rule),
     Seal { did: DomainId },
     Emit { did: DomainId },
+}
+
+#[derive(Debug)]
+pub struct Rule {
+    pub consequents: Vec<RuleAtom>,
+    pub antecedents: Vec<RuleLiteral>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

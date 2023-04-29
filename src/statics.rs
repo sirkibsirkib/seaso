@@ -14,21 +14,17 @@ pub enum ParamsMapErr {
 }
 
 type FirstSealedAt = HashMap<DomainId, StatementIdx>;
+type RuleToVidToDid = HashMap<StatementIdx, VidToDid>;
+type VidToDid = HashMap<VariableId, DomainId>;
 
-type Typing = HashMap<StatementIdx, RuleTyping>;
-
-#[derive(Debug, Default)]
-pub struct RuleTyping {
-    map: HashMap<VariableId, DomainId>,
-}
 #[derive(Debug)]
 pub enum CheckErr {
     ParamsMapErr(ParamsMapErr),
     UndefinedConstructor { sidx: StatementIdx, did: DomainId },
-    RuleTypingErr { sidx: StatementIdx, err: RuleTypingErr },
+    VidToDidErr { sidx: StatementIdx, err: VidToDidErr },
 }
 #[derive(Debug)]
-pub enum RuleTypingErr {
+pub enum VidToDidErr {
     UndefinedConstructor { did: DomainId },
     MultipleTypes { vid: VariableId, domains: [DomainId; 2] },
     NoTypes { vid: VariableId },
@@ -43,7 +39,7 @@ pub struct SealBreak {
 }
 
 impl Program {
-    pub fn check(&self) -> Result<Typing, CheckErr> {
+    pub fn check(&self) -> Result<RuleToVidToDid, CheckErr> {
         // step 1: no duplicate domain definitions
         let pm = self.new_params_map().map_err(CheckErr::ParamsMapErr)?;
 
@@ -56,18 +52,15 @@ impl Program {
         }
 
         // step 3: check rules and return variable types
-        let t: Typing = self
-            .statements
+        self.statements
             .iter()
             .enumerate()
             .flat_map(|(sidx, statement)| {
                 statement.rule_typing(&pm).map(|x| {
-                    x.map(|x| (sidx, x)).map_err(|err| CheckErr::RuleTypingErr { sidx, err })
+                    x.map(|x| (sidx, x)).map_err(|err| CheckErr::VidToDidErr { sidx, err })
                 })
             })
-            .collect::<Result<Typing, _>>()?;
-
-        Ok(t)
+            .collect()
     }
 
     pub fn seal_break(&self) -> Option<SealBreak> {
@@ -77,7 +70,7 @@ impl Program {
                 Statement::Seal { did } => {
                     sfa.insert(did.clone(), sidx);
                 }
-                Statement::Rule { consequents, .. } => {
+                Statement::Rule(Rule { consequents, .. }) => {
                     for consequent in consequents {
                         if let RuleAtom::Construct { did, .. } = consequent {
                             if let Some(&s_sidx) = sfa.get(did) {
@@ -140,7 +133,7 @@ impl Statement {
                     None
                 }
             }
-            Statement::Rule { consequents, antecedents } => consequents
+            Statement::Rule(Rule { consequents, antecedents }) => consequents
                 .iter()
                 .chain(antecedents.iter().map(|antecedent| &antecedent.ra))
                 .map(|ra| ra.undeclared_domain_id(declarations))
@@ -148,29 +141,29 @@ impl Statement {
                 .flatten(),
         }
     }
-    fn rule_typing(&self, pm: &ParamsMap) -> Option<Result<RuleTyping, RuleTypingErr>> {
+    fn rule_typing(&self, pm: &ParamsMap) -> Option<Result<VidToDid, VidToDidErr>> {
         match self {
-            Statement::Rule { consequents, antecedents } => {
-                let mut rt = RuleTyping::default();
+            Statement::Rule(Rule { consequents, antecedents }) => {
+                let mut v2d = VidToDid::default();
                 let mut vids = Default::default();
                 for ra in consequents.iter().chain(antecedents.iter().map(|lit| &lit.ra)) {
                     ra.variables(&mut vids);
-                    if let Err(err) = ra.typing(pm, &mut rt) {
+                    if let Err(err) = ra.typing(pm, &mut v2d) {
                         return Some(Err(err));
                     }
                 }
-                Some(if let Some(vid) = vids.iter().find(|&vid| !rt.map.contains_key(vid)) {
-                    Err(RuleTypingErr::NoTypes { vid: vid.clone() })
+                Some(if let Some(vid) = vids.iter().find(|&vid| !v2d.contains_key(vid)) {
+                    Err(VidToDidErr::NoTypes { vid: vid.clone() })
                 } else {
                     // enumerability check
                     let mut enumerable = HashSet::default();
                     for antecedent in antecedents {
-                        antecedent.variables_if_enumerable(&rt, &mut enumerable);
+                        antecedent.variables_if_enumerable(&v2d, &mut enumerable);
                     }
                     if let Some(vid) = vids.difference(&enumerable).next() {
-                        Err(RuleTypingErr::VariableNotEnumerable { vid: vid.clone() })
+                        Err(VidToDidErr::VariableNotEnumerable { vid: vid.clone() })
                     } else {
-                        Ok(rt)
+                        Ok(v2d)
                     }
                 })
             }
@@ -180,13 +173,13 @@ impl Statement {
 }
 
 impl RuleAtom {
-    fn typing(&self, pm: &ParamsMap, rt: &mut RuleTyping) -> Result<(), RuleTypingErr> {
+    fn typing(&self, pm: &ParamsMap, v2d: &mut VidToDid) -> Result<(), VidToDidErr> {
         match self {
             RuleAtom::Construct { did, args } => {
                 let (_defn_sidx, params) =
-                    pm.get(did).ok_or(RuleTypingErr::UndefinedConstructor { did: did.clone() })?;
+                    pm.get(did).ok_or(VidToDidErr::UndefinedConstructor { did: did.clone() })?;
                 if params.len() != args.len() {
-                    return Err(RuleTypingErr::WrongArity {
+                    return Err(VidToDidErr::WrongArity {
                         did: did.clone(),
                         params: params.len(),
                         args: args.len(),
@@ -194,9 +187,9 @@ impl RuleAtom {
                 }
                 for (arg, param) in args.iter().zip(params.iter()) {
                     if let RuleAtom::Variable { vid } = arg {
-                        match rt.map.insert(vid.clone(), param.clone()) {
+                        match v2d.insert(vid.clone(), param.clone()) {
                             Some(param2) if param != &param2 => {
-                                return Err(RuleTypingErr::MultipleTypes {
+                                return Err(VidToDidErr::MultipleTypes {
                                     vid: vid.clone(),
                                     domains: [param.clone(), param2.clone()],
                                 });
@@ -206,7 +199,7 @@ impl RuleAtom {
                     }
                 }
                 for arg in args {
-                    arg.typing(pm, rt)?
+                    arg.typing(pm, v2d)?
                 }
             }
             _ => {}
@@ -238,7 +231,17 @@ impl RuleAtom {
 }
 
 impl RuleLiteral {
-    fn variables_if_enumerable(&self, rt: &RuleTyping, variables: &mut HashSet<VariableId>) {
+    fn is_enumerable(&self, v2d: &VidToDid) -> bool {
+        self.sign == Sign::Pos && {
+            match &self.ra {
+                RuleAtom::Construct { did, .. } => did,
+                RuleAtom::Variable { vid } => v2d.get(vid).expect("Checked before, I think"),
+                _ => return false,
+            }
+            .is_primitive()
+        }
+    }
+    fn variables_if_enumerable(&self, v2d: &VidToDid, variables: &mut HashSet<VariableId>) {
         if self.sign == Sign::Pos {
             match &self.ra {
                 RuleAtom::Construct { did, args } if !did.is_primitive() => {
@@ -247,7 +250,7 @@ impl RuleLiteral {
                     }
                 }
                 RuleAtom::Variable { vid } => {
-                    let did = rt.map.get(vid).expect("Checked before, I think");
+                    let did = v2d.get(vid).expect("Checked before, I think");
                     if !did.is_primitive() {
                         self.ra.variables(variables)
                     }

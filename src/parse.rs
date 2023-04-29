@@ -102,7 +102,7 @@ fn rule(i: &str) -> IResult<&str, Statement> {
         preceded(ws(tag(":-")), commasep(rule_literal)),
         nommap(multispace0, |_| Vec::default()),
     ))(i)?;
-    Ok((i, Statement::Rule { consequents, antecedents }))
+    Ok((i, Statement::Rule(Rule { consequents, antecedents })))
 }
 
 ////////// (SUB)EXPRESSION PARSERS //////////
