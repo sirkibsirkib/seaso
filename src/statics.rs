@@ -15,7 +15,7 @@ pub enum ParamsMapErr {
 
 type FirstSealedAt = HashMap<DomainId, StatementIdx>;
 type RuleToVidToDid = HashMap<StatementIdx, VidToDid>;
-type VidToDid = HashMap<VariableId, DomainId>;
+pub type VidToDid = HashMap<VariableId, DomainId>;
 
 #[derive(Debug)]
 pub enum CheckErr {

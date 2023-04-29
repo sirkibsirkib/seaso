@@ -1,4 +1,5 @@
 use crate::ast::*;
+use crate::statics::VidToDid;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -45,28 +46,50 @@ impl RuleAtom {
         })
     }
 }
+impl RuleAtom {
+    fn construct_did(&self) -> Option<&DomainId> {
+        match self {
+            RuleAtom::Construct { did, .. } => Some(did),
+            _ => None,
+        }
+    }
+}
 
 fn enumerate_rule(
     rule: &Rule,
-    antecedents: &[RuleLiteral],
+    v2d: &VidToDid,
+    tail_antecedents: &[RuleLiteral],
     vm: &mut VarMap,
-    knowledge: &mut Knowledge,
+    pos_knowledge: &mut Knowledge,
+    neg_knowledge: &Knowledge,
 ) {
-    match antecedents {
+    match tail_antecedents {
         [] => {
             // check checkable antecedents (TODO can be more efficient)
-
+            for RuleLiteral { sign, ra } in &rule.antecedents {
+                let knowledge = match sign {
+                    Sign::Pos => pos_knowledge,
+                    Sign::Neg => neg_knowledge,
+                };
+                let did = ra.construct_did().expect("woo");
+                if !knowledge
+                    .map
+                    .get(did)
+                    .map(|set| set.contains(&ra.concretized(vm).expect("WAH")))
+                    .unwrap_or(false)
+                {
+                    // check failed!
+                    return;
+                }
+            }
             // write consequents
             for consequent in &rule.consequents {
                 let ra = consequent.concretized(vm).expect("WAH");
-                let did = match &ra {
-                    RuleAtom::Construct { did, .. } => did.clone(),
-                    _ => unreachable!(),
-                };
-                knowledge.map.entry(did).or_default().insert(ra);
+                let did = ra.construct_did().expect("woo").clone();
+                pos_knowledge.map.entry(did).or_default().insert(ra);
             }
         }
-        [head, tail @ ..] => {
+        [rl, tail @ ..] => {
             todo!()
         }
     }
