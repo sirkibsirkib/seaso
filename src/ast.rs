@@ -6,11 +6,16 @@ pub struct DomainId(pub String);
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub struct VariableId(pub String);
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub enum Constant {
+    Int(i64),
+    Str(String),
+}
+
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum RuleAtom {
     Variable { vid: VariableId },
-    IntConst { c: i64 },
-    StrConst { c: String },
+    Constant { c: Constant },
     Construct { did: DomainId, args: Vec<RuleAtom> },
 }
 

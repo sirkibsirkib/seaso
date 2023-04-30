@@ -14,7 +14,7 @@ pub enum ParamsMapErr {
 }
 
 type FirstSealedAt = HashMap<DomainId, StatementIdx>;
-type RuleToVidToDid = HashMap<StatementIdx, VidToDid>;
+pub type RuleToVidToDid = HashMap<StatementIdx, VidToDid>;
 pub type VidToDid = HashMap<VariableId, DomainId>;
 
 #[derive(Debug)]
@@ -30,6 +30,16 @@ pub enum VidToDidErr {
     NoTypes { vid: VariableId },
     WrongArity { did: DomainId, params: usize, args: usize },
     VariableNotEnumerable { vid: VariableId },
+}
+
+trait OnlyIf: Sized {
+    fn only_if(self, b: bool) -> Option<Self> {
+        if b {
+            Some(self)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -116,7 +126,7 @@ impl Program {
 impl DomainId {
     fn is_primitive(&self) -> bool {
         match self.0.as_ref() {
-            "int" | "str" => true,
+            "int" | "str" | "eq" => true,
             _ => false,
         }
     }
@@ -208,7 +218,7 @@ impl RuleAtom {
     }
     fn variables(&self, vids: &mut HashSet<VariableId>) {
         match self {
-            RuleAtom::IntConst { .. } | RuleAtom::StrConst { .. } => {}
+            RuleAtom::Constant { .. } => {}
             RuleAtom::Variable { vid } => drop(vids.insert(vid.clone())),
             RuleAtom::Construct { args, .. } => {
                 for arg in args {
@@ -231,7 +241,10 @@ impl RuleAtom {
 }
 
 impl RuleLiteral {
-    pub fn is_enumerable_in(&self, v2d: &VidToDid) -> Option<DomainId> {
+    pub fn is_enumerable_in<'a: 'c, 'b: 'c, 'c>(
+        &'a self,
+        v2d: &'b VidToDid,
+    ) -> Option<&'c DomainId> {
         if self.sign == Sign::Pos {
             let did = match &self.ra {
                 RuleAtom::Construct { did, .. } => did,
@@ -239,7 +252,7 @@ impl RuleLiteral {
                 _ => return None,
             };
             if !did.is_primitive() {
-                return Some(did.clone());
+                return Some(did);
             }
         };
         None

@@ -125,13 +125,17 @@ fn variable(i: &str) -> IResult<&str, RuleAtom> {
     nommap(variable_id, |vid| RuleAtom::Variable { vid })(i)
 }
 
-fn int_const(i: &str) -> IResult<&str, RuleAtom> {
-    nommap(ws(nomi64), |c| RuleAtom::IntConst { c })(i)
+fn constant(i: &str) -> IResult<&str, RuleAtom> {
+    nommap(ws(alt((int_constant, str_constant))), |c| RuleAtom::Constant { c })(i)
 }
 
-fn str_const(i: &str) -> IResult<&str, RuleAtom> {
-    nommap(ws(delimited(tag("\""), recognize(many0_count(none_of("\""))), tag("\""))), |c| {
-        RuleAtom::StrConst { c: c.to_owned() }
+fn int_constant(i: &str) -> IResult<&str, Constant> {
+    nommap(nomi64, |c| Constant::Int(c))(i)
+}
+
+fn str_constant(i: &str) -> IResult<&str, Constant> {
+    nommap(delimited(tag("\""), recognize(many0_count(none_of("\""))), tag("\"")), |c: &str| {
+        Constant::Str(c.to_owned())
     })(i)
 }
 
@@ -141,7 +145,7 @@ fn construct(i: &str) -> IResult<&str, RuleAtom> {
 }
 
 fn rule_atom(i: &str) -> IResult<&str, RuleAtom> {
-    alt((variable, int_const, str_const, construct))(i)
+    alt((variable, constant, construct))(i)
 }
 
 fn rule_literal(i: &str) -> IResult<&str, RuleLiteral> {
