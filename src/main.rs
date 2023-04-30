@@ -6,7 +6,8 @@ mod statics;
 
 fn main() -> Result<(), ()> {
     let source = "
-    defn x(int). y(int,int).
+    defn x(int). y(int,int). z(int,int).
+    rule z(2,2).
     rule x(2). x(3). y(A,B) :- x(A), x(B).
     ";
     let parse_result = parse::program(source);
