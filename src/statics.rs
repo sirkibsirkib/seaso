@@ -1,4 +1,5 @@
 use crate::ast::*;
+use core::ops::Range;
 use std::collections::{HashMap, HashSet};
 
 // enum DeconstructionErr {
@@ -235,6 +236,14 @@ impl RuleAtom {
                 }
                 args.iter().map(|ra| ra.undeclared_domain_id(declarations)).next().flatten()
             }
+            _ => None,
+        }
+    }
+    // NOTE: assumes `v2d` covers all occurring variables
+    pub fn domain_id<'a: 'c, 'b: 'c, 'c>(&'a self, v2d: &'b VidToDid) -> Option<&'c DomainId> {
+        match self {
+            RuleAtom::Construct { did, .. } => Some(did),
+            RuleAtom::Variable { vid } => v2d.get(vid),
             _ => None,
         }
     }
