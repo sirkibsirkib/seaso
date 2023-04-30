@@ -5,17 +5,20 @@ mod parse;
 mod statics;
 
 fn main() -> Result<(), ()> {
-    let p = parse::program(
-        "
-        seal x. emit x.
-        defn x(int). y(x,x,x). coolint(int).
-        rule y(A,x(B),x(B)) :- x(B), A, x(C).
-        ",
-    );
-    println!("{:#?}", p);
-    let p = p.map_err(drop)?.1;
-    let t = p.check();
-    eprintln!("{:?}", t);
-    eprintln!("{:?}", p.seal_break());
+    let source = "
+    defn x(int). y(int).
+    rule x(2).
+    rule y(2) :- x(2).
+    ";
+    let parse_result = parse::program(source);
+    println!("{:#?}", parse_result);
+    let (_input, program) = parse_result.map_err(drop)?;
+    let check_result = program.check();
+    println!("{:?}", check_result);
+    let r2v2d = check_result.map_err(drop)?;
+    println!("{:?}", program.seal_break());
+    let neg = dynamics::Knowledge::default();
+    let pos = program.big_step_inference(&r2v2d, &neg);
+    println!("{:?}", pos);
     Ok(())
 }

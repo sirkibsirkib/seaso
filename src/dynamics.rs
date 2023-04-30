@@ -5,14 +5,15 @@ use crate::statics::VidToDid;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-#[derive(Hash, Eq, PartialEq, Debug, Clone)]
+/// Concrete counterpart to `RuleAtom` with no domain info
+#[derive(Hash, Eq, PartialEq, Clone)]
 enum Atom {
     Constant { c: Constant },
-    Construct { args: Vec<Atom> },
+    Construct { did: DomainId, args: Vec<Atom> },
 }
 
-#[derive(Debug, Default)]
-struct Knowledge {
+#[derive(Default)]
+pub struct Knowledge {
     map: HashMap<DomainId, HashSet<Atom>>,
 }
 
@@ -22,6 +23,41 @@ struct VariableAssignments {
 }
 struct StateToken {
     assignments_count: usize,
+}
+
+impl std::fmt::Debug for Atom {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Constant { c } => match c {
+                Constant::Int(c) => {
+                    let mut f = f.debug_tuple("int");
+                    f.field(c);
+                    f
+                }
+                Constant::Str(c) => {
+                    let mut f = f.debug_tuple("str");
+                    f.field(c);
+                    f
+                }
+            },
+            Self::Construct { did, args } => {
+                let mut f = f.debug_tuple(&did.0);
+                for arg in args {
+                    f.field(arg);
+                }
+                f
+            }
+        }
+        .finish()
+    }
+}
+
+impl std::fmt::Debug for Knowledge {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let iter =
+            self.map.iter().flat_map(|(did, set)| set.iter().map(move |atom| (&did.0, atom)));
+        f.debug_set().entries(iter).finish()
+    }
 }
 
 impl VariableAssignments {
@@ -63,7 +99,7 @@ impl VariableAssignments {
 }
 
 impl Program {
-    fn big_step_inference(&self, r2v2d: &RuleToVidToDid, neg: &Knowledge) -> Knowledge {
+    pub fn big_step_inference(&self, r2v2d: &RuleToVidToDid, neg: &Knowledge) -> Knowledge {
         let mut pos = Knowledge::default();
         let mut changed;
         loop {
@@ -101,7 +137,7 @@ impl Atom {
     ) -> Result<(), ()> {
         match (self, ra) {
             (atom1, RuleAtom::Variable { vid }) => va.insert(vid, atom1.clone()),
-            (Atom::Construct { args: atoms }, RuleAtom::Construct { args: rule_atoms, .. }) => {
+            (Atom::Construct { args: atoms, .. }, RuleAtom::Construct { args: rule_atoms, .. }) => {
                 if atoms.len() == rule_atoms.len() {
                     for (atom, rule_atom) in atoms.iter().zip(rule_atoms) {
                         atom.uniquely_assign_variables(rule_atom, va)?
@@ -122,8 +158,9 @@ impl RuleAtom {
         match self {
             RuleAtom::Variable { vid } => va.get(vid).ok_or(()).cloned(),
             RuleAtom::Constant { c } => Ok(Atom::Constant { c: c.clone() }),
-            RuleAtom::Construct { args, .. } => Ok(Atom::Construct {
+            RuleAtom::Construct { args, did } => Ok(Atom::Construct {
                 args: args.iter().map(|ra| ra.concretize(va)).collect::<Result<Vec<_>, _>>()?,
+                did: did.clone(),
             }),
         }
     }
