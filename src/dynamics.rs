@@ -17,7 +17,7 @@ pub struct Knowledge {
     map: HashMap<DomainId, HashSet<Atom>>,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct VariableAssignments {
     assignments: Vec<(VariableId, Atom)>,
 }
@@ -110,6 +110,7 @@ impl Program {
                     rule.inference_stage(v2d, neg, &mut pos, &mut changed);
                 }
             }
+            println!("POS SO FAR {:?}", pos);
             if !changed {
                 return pos;
             }
@@ -126,6 +127,15 @@ impl Knowledge {
     }
     fn insert(&mut self, did: &DomainId, atom: Atom) -> bool {
         self.map.entry(did.clone()).or_default().insert(atom)
+    }
+    fn absorb_all(&mut self, other: Self, changed: &mut bool) {
+        for (did, set) in other.map {
+            for atom in set {
+                if self.insert(&did, atom) {
+                    *changed = true;
+                }
+            }
+        }
     }
 }
 
@@ -176,7 +186,6 @@ impl Rule {
         changed: &mut bool,
         tail: &[RuleLiteral],
     ) {
-        let state_token = va.get_state_token();
         match tail {
             [] => {
                 // perform all checks
@@ -188,7 +197,7 @@ impl Rule {
                             Sign::Pos => todo!(),
                             Sign::Neg => {
                                 if !neg.contains(did, &atom) {
-                                    return;
+                                    break;
                                 }
                             }
                         }
@@ -198,25 +207,29 @@ impl Rule {
                 for consequent in self.consequents.iter() {
                     let did = consequent.domain_id(v2d).expect("static checked");
                     let atom = consequent.concretize(va).expect("should work");
-                    if pos.insert(did, atom) {
-                        *changed = true;
-                    }
+                    pos.insert(did, atom);
                 }
-                // base
             }
-            [head, new_tail @ ..] => {
-                if let Some(did) = head.is_enumerable_in(v2d) {
+            [head, new_tail @ ..] => match head.is_enumerable_in(v2d) {
+                Some(did) => {
                     assert_eq!(head.sign, Sign::Pos);
+                    let mut pos2 = Knowledge::default();
                     for atom in pos.iter_did(did) {
+                        println!("ASSIGN_BEFORE {:?}", va);
+
+                        let state_token = va.get_state_token();
                         if atom.uniquely_assign_variables(&head.ra, va).is_err() {
-                            va.restore_state(state_token).expect("waheyy");
-                            return;
+                            break;
                         }
+                        println!("AFTER {:?}", va);
+
+                        self.inference_stage_rec(v2d, neg, &mut pos2, va, changed, new_tail);
+                        va.restore_state(state_token).expect("oh no");
                     }
+                    pos.absorb_all(pos2, changed)
                 }
-                self.inference_stage_rec(v2d, neg, pos, va, changed, new_tail);
-                va.restore_state(state_token).expect("oh no");
-            }
+                None => self.inference_stage_rec(v2d, neg, pos, va, changed, new_tail),
+            },
         }
     }
     fn inference_stage(
@@ -227,6 +240,7 @@ impl Rule {
         changed: &mut bool,
     ) {
         let mut va = VariableAssignments::default();
+        dbg!(self);
         self.inference_stage_rec(v2d, neg, pos, &mut va, changed, &self.antecedents)
     }
 }
