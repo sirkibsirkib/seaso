@@ -100,19 +100,19 @@ impl VariableAssignments {
 
 impl Program {
     pub fn big_step_inference(&self, r2v2d: &RuleToVidToDid, neg: &Knowledge) -> Knowledge {
-        let mut pos = Knowledge::default();
-        let mut changed;
+        let mut pos_r = Knowledge::default();
+        let mut pos_w = Knowledge::default();
         loop {
-            changed = false;
             for (sidx, statement) in self.statements.iter().enumerate() {
                 if let Statement::Rule(rule) = statement {
                     let v2d = r2v2d.get(&sidx).expect("wah");
-                    rule.inference_stage(v2d, neg, &mut pos, &mut changed);
+                    rule.inference_stage(v2d, neg, &pos_r, &mut pos_w);
                 }
             }
-            println!("POS SO FAR {:?}", pos);
+            let changed = pos_r.absorb_all(&mut pos_w);
+            println!("POS SO FAR {:?}", pos_r);
             if !changed {
-                return pos;
+                return pos_r;
             }
         }
     }
@@ -128,14 +128,16 @@ impl Knowledge {
     fn insert(&mut self, did: &DomainId, atom: Atom) -> bool {
         self.map.entry(did.clone()).or_default().insert(atom)
     }
-    fn absorb_all(&mut self, other: Self, changed: &mut bool) {
-        for (did, set) in other.map {
+    fn absorb_all(&mut self, other: &mut Self) -> bool {
+        let mut changed = false;
+        for (did, set) in other.map.drain() {
             for atom in set {
                 if self.insert(&did, atom) {
-                    *changed = true;
+                    changed = true;
                 }
             }
         }
+        changed
     }
 }
 
@@ -181,9 +183,9 @@ impl Rule {
         &self,
         v2d: &VidToDid,
         neg: &Knowledge,
-        pos: &mut Knowledge,
+        pos_r: &Knowledge,
+        pos_w: &mut Knowledge,
         va: &mut VariableAssignments,
-        changed: &mut bool,
         tail: &[RuleLiteral],
     ) {
         match tail {
@@ -207,14 +209,13 @@ impl Rule {
                 for consequent in self.consequents.iter() {
                     let did = consequent.domain_id(v2d).expect("static checked");
                     let atom = consequent.concretize(va).expect("should work");
-                    pos.insert(did, atom);
+                    pos_w.insert(did, atom);
                 }
             }
             [head, new_tail @ ..] => match head.is_enumerable_in(v2d) {
                 Some(did) => {
                     assert_eq!(head.sign, Sign::Pos);
-                    let mut pos2 = Knowledge::default();
-                    for atom in pos.iter_did(did) {
+                    for atom in pos_r.iter_did(did) {
                         println!("ASSIGN_BEFORE {:?}", va);
 
                         let state_token = va.get_state_token();
@@ -222,13 +223,11 @@ impl Rule {
                             break;
                         }
                         println!("AFTER {:?}", va);
-
-                        self.inference_stage_rec(v2d, neg, &mut pos2, va, changed, new_tail);
+                        self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail);
                         va.restore_state(state_token).expect("oh no");
                     }
-                    pos.absorb_all(pos2, changed)
                 }
-                None => self.inference_stage_rec(v2d, neg, pos, va, changed, new_tail),
+                None => self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail),
             },
         }
     }
@@ -236,11 +235,11 @@ impl Rule {
         &self,
         v2d: &VidToDid,
         neg: &Knowledge,
-        pos: &mut Knowledge,
-        changed: &mut bool,
+        pos_r: &Knowledge,
+        pos_w: &mut Knowledge,
     ) {
         let mut va = VariableAssignments::default();
         dbg!(self);
-        self.inference_stage_rec(v2d, neg, pos, &mut va, changed, &self.antecedents)
+        self.inference_stage_rec(v2d, neg, pos_r, pos_w, &mut va, &self.antecedents)
     }
 }
