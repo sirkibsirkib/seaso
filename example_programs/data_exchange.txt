@@ -1,0 +1,88 @@
+decl agent. data.
+defn agent(str). data(str).
+
+defn transfer(agent,data,agent).
+rule transfer(agent("Alice"), data("Test Data"), agent("Bob")).
+seal transfer.
+
+decl computation.
+defn with(computation,data).
+defn input(computation,data).
+     output(computation,data).
+     function(computation,data).
+     parameter(computation,int,data).
+rule C, D :- with(C,D).
+     with(C,D) :- input(C,D).
+     with(C,D) :- output(C,D).
+     input(C,D) :- function(C,D).
+     input(C,D) :- parameter(C,I,D).
+
+decl computation.
+defn compute(agent,computation).
+
+decl workflow.
+defn task(workflow,computation).
+     goal(workflow,data).
+rule W, C :- task(W,C).
+     W, D :- goal(W,D).
+
+defn planned(task,agent).
+rule T, A :- planned(T,A).
+
+decl context.
+defn accessor(agent,context).
+defn consumer(agent,context).
+defn provider(agent,context).
+defn functionProvider(agent,context).
+defn parameterProvider(agent,context).
+rule A, C :- accessor(A,C).
+     accessor(A,C) :- consumer(A,C).
+     accessor(A,C) :- provider(A,C).
+     provider(A,C) :- functionProvider(A,C).
+     provider(A,C) :- parameterProvider(A,C).
+
+defn role(str). playRole(agent,role,context).
+rule playRole(A,role("accessor"),C) :- accessor(A,C).
+     playRole(A,role("consumer"),C) :- consumer(A,C).
+     accessor(A,C) :- playRole(A,"accessor",C).
+     consumer(A,C) :- playRole(A,"consumer",C).
+
+defn computation(context).
+defn computer(agent,context).
+rule computer(A,Ctx)
+     :- compute(A,computation(Ctx)).
+
+defn orgA(agent,context). orgB(agent,context).
+rule computer(A,C), functionProvider(A,C)
+     :- orgA(A,C).
+rule consumer(A,C), parameterProvider(A,C)
+     :- orgB(A,C).
+seal computer. functionProvider.
+     consumer. parameterProvider.
+
+defn dataLeak(transfer). emit dataLeak.
+
+defn happens(compute). isPlanned(happens).
+     notPlanned(happens). prohibited(happens).
+emit notPlanned. prohibited.
+rule notPlanned(H) :- H, !isPlanned(H).
+     isPlanned(happens(compute(A,C)))
+       :- happens(compute(A,C)), planned(task(W,C),A).
+     prohibited(happens(compute(A,computation(Ctx))))
+       :- happens(compute(A,computation(Ctx))), !computer(A,Ctx).
+    
+defn context(str). workflow(str).
+rule computer(agent("Amy"),computation(context("Ctx1"))).
+     happens(compute(agent("Amy"),computation(context("Ctx1")))).
+
+rule planned(task(workflow("W1"),computation(context("Ctx1"))),agent("Amy")).
+
+
+defn before(happens,happens).
+     recompute(agent,data).
+emit recompute.
+rule before(X,Z) :- before(X,Y), before(Y,Z).
+     recompute(A2,D) :-
+        before(compute(A1,C1),compute(A2,C2)),
+        output(C1,D), happens(compute(A1,C1)),
+        output(C2,D), happens(compute(A2,C2)).

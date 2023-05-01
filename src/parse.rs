@@ -5,7 +5,7 @@ use nom::{
     bytes::complete::tag,
     character::{
         complete::i64 as nomi64,
-        complete::{alpha1, multispace0, none_of, satisfy},
+        complete::{alphanumeric1, multispace0, none_of, satisfy},
     },
     combinator::{map as nommap, opt, recognize},
     error::ParseError,
@@ -108,7 +108,7 @@ fn rule(i: &str) -> IResult<&str, Statement> {
 ////////// (SUB)EXPRESSION PARSERS //////////
 
 fn id_suffix(i: &str) -> IResult<&str, &str> {
-    recognize(many0_count(alt((tag("_"), alpha1))))(i)
+    recognize(many0_count(alt((tag("_"), alphanumeric1))))(i)
 }
 
 fn domain_id(i: &str) -> IResult<&str, DomainId> {

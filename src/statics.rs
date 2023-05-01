@@ -4,21 +4,16 @@ use std::collections::{HashMap, HashSet};
 
 type ParamsMap = HashMap<DomainId, (StatementIdx, Vec<DomainId>)>;
 
-#[derive(Debug)]
-pub enum ParamsMapErr {
-    DuplicateDefn([StatementIdx; 2]),
-}
-
 type FirstSealedAt = HashMap<DomainId, StatementIdx>;
 pub type RuleToVidToDid = HashMap<StatementIdx, VidToDid>;
 pub type VidToDid = HashMap<VariableId, DomainId>;
 
 #[derive(Debug)]
-pub enum CheckErr {
-    ParamsMapErr(ParamsMapErr),
-    UndefinedConstructor { sidx: StatementIdx, did: DomainId },
-    RuleCheckErr { sidx: StatementIdx, err: RuleCheckErr },
+pub struct CheckErr {
+    pub sidx: StatementIdx,
+    pub err: RuleCheckErr,
 }
+
 #[derive(Debug)]
 pub enum RuleCheckErr {
     UndefinedConstructor { did: DomainId },
@@ -28,6 +23,7 @@ pub enum RuleCheckErr {
     VariableNotEnumerable { vid: VariableId },
     PrimitiveConsequent { did: DomainId },
     PrimitiveAntecedent { did: DomainId },
+    ConflictingDefinition { did: DomainId, previous_sidx: StatementIdx },
 }
 
 #[derive(Debug)]
@@ -37,15 +33,24 @@ pub struct SealBreak {
 }
 
 impl Program {
+    pub fn emitted(&self) -> HashSet<&DomainId> {
+        self.statements
+            .iter()
+            .filter_map(|statement| match statement {
+                Statement::Emit { did } => Some(did),
+                _ => None,
+            })
+            .collect()
+    }
     pub fn check(&self) -> Result<RuleToVidToDid, CheckErr> {
         // step 1: no duplicate domain definitions
-        let pm = self.new_params_map().map_err(CheckErr::ParamsMapErr)?;
+        let pm = self.new_params_map()?;
 
         // step 2: all constructs are declared
         let declarations = self.declarations();
         for (sidx, statement) in self.statements.iter().enumerate() {
             if let Some(did) = statement.undeclared_domain_id(&declarations) {
-                return Err(CheckErr::UndefinedConstructor { sidx, did });
+                return Err(CheckErr { sidx, err: RuleCheckErr::UndefinedConstructor { did } });
             }
         }
 
@@ -54,9 +59,9 @@ impl Program {
             .iter()
             .enumerate()
             .flat_map(|(sidx, statement)| {
-                statement.rule_typing(&pm).map(|x| {
-                    x.map(|x| (sidx, x)).map_err(|err| CheckErr::RuleCheckErr { sidx, err })
-                })
+                statement
+                    .rule_typing(&pm)
+                    .map(|x| x.map(|x| (sidx, x)).map_err(|err| CheckErr { sidx, err }))
             })
             .collect()
     }
@@ -88,13 +93,23 @@ impl Program {
         None
     }
 
-    fn new_params_map(&self) -> Result<ParamsMap, ParamsMapErr> {
+    fn new_params_map(&self) -> Result<ParamsMap, CheckErr> {
         let mut pm = ParamsMap::default();
         for (sidx, statement) in self.statements.iter().enumerate() {
             if let Statement::Defn { did, params } = statement {
                 let value = (sidx, params.clone());
-                if let Some(previous) = pm.insert(did.clone(), value) {
-                    return Err(ParamsMapErr::DuplicateDefn([previous.0, sidx]));
+                if let Some((previous_sidx, previous_params)) =
+                    pm.insert(did.clone(), value.clone())
+                {
+                    if &previous_params != params {
+                        return Err(CheckErr {
+                            sidx,
+                            err: RuleCheckErr::ConflictingDefinition {
+                                previous_sidx,
+                                did: did.clone(),
+                            },
+                        });
+                    }
                 }
             }
         }
@@ -125,7 +140,7 @@ impl Statement {
         match self {
             Statement::Decl { .. } | Statement::Defn { .. } => None,
             Statement::Emit { did } | Statement::Seal { did } => {
-                if declarations.contains(did) {
+                if !declarations.contains(did) {
                     Some(did.clone())
                 } else {
                     None

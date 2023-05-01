@@ -18,8 +18,9 @@ pub struct Knowledge {
 
 #[derive(Debug)]
 pub struct Denotation {
-    pub pos: Knowledge,
-    pub unk: Knowledge,
+    pub trues: Knowledge,
+    pub unknowns: Knowledge,
+    pub emitted: Knowledge,
 }
 
 #[derive(Debug, Default)]
@@ -143,16 +144,30 @@ impl Program {
             vec![self.big_step_inference(r2v2d, ComplementKnowledge::Empty, &mut pos_w, &mut va)];
         loop {
             // println!("\n>>>>>> INTERPRTATIONS: {:?}", &interpretations);
-            if interpretations.len() >= 8 && interpretations.len() % 2 == 1 {
+            if interpretations.len() % 2 == 1 {
                 if let [.., a, b, c, d] = interpretations.as_mut_slice() {
                     if a == c && b == d {
                         use std::mem::take;
-                        let pos = take(d);
-                        let mut unk = take(c);
-                        for (did, set) in unk.map.iter_mut() {
-                            set.retain(|atom| !pos.contains(did, atom))
+                        let trues = take(d);
+                        let mut unknowns = take(c);
+                        for (did, set) in unknowns.map.iter_mut() {
+                            set.retain(|atom| !trues.contains(did, atom))
                         }
-                        return Denotation { pos, unk };
+                        let emitted_dids = self.emitted();
+                        let emitted = Knowledge {
+                            map: trues
+                                .map
+                                .iter()
+                                .filter_map(|(did, set)| {
+                                    if emitted_dids.contains(did) {
+                                        Some((did.clone(), set.clone()))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect(),
+                        };
+                        return Denotation { trues, unknowns, emitted };
                     }
                 }
             }

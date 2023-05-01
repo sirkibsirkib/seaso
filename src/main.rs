@@ -29,7 +29,10 @@ fn main() -> Result<(), ()> {
                 start_i2 - start_i1,
                 start_i3 - start_i2
             );
-            println!("Denotation:\n  pos: {:?}\n  unk: {:?}", &den.pos, &den.unk);
+            println!(
+                "Denotation:\n  trues: {:?}\n  unknowns: {:?}\n  emitted: {:?}",
+                &den.trues, &den.unknowns, &den.emitted,
+            );
         }
         println!("seal broken: {:?}", program.seal_break());
         println!("check result {:?}", check_result.as_ref().map(drop));
