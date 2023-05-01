@@ -12,9 +12,15 @@ enum Atom {
     Construct { did: DomainId, args: Vec<Atom> },
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq, Eq)]
 pub struct Knowledge {
     map: HashMap<DomainId, HashSet<Atom>>,
+}
+
+#[derive(Debug)]
+pub struct Denotation {
+    pub pos: Knowledge,
+    pub unk: Knowledge,
 }
 
 #[derive(Debug, Default)]
@@ -30,14 +36,16 @@ impl std::fmt::Debug for Atom {
         match self {
             Self::Constant { c } => match c {
                 Constant::Int(c) => {
-                    let mut f = f.debug_tuple("int");
-                    f.field(c);
-                    f
+                    c.fmt(f)
+                    // let mut f = f.debug_tuple("int");
+                    // f.field(c);
+                    // f
                 }
                 Constant::Str(c) => {
-                    let mut f = f.debug_tuple("str");
-                    f.field(c);
-                    f
+                    // let mut f = f.debug_tuple("str");
+                    // f.field(c);
+                    // f
+                    c.fmt(f)
                 }
             },
             Self::Construct { did, args } => {
@@ -45,17 +53,16 @@ impl std::fmt::Debug for Atom {
                 for arg in args {
                     f.field(arg);
                 }
-                f
+                f.finish()
             }
         }
-        .finish()
+        // .finish()
     }
 }
 
 impl std::fmt::Debug for Knowledge {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let iter =
-            self.map.iter().flat_map(|(did, set)| set.iter().map(move |atom| (&did.0, atom)));
+        let iter = self.map.values().flat_map(HashSet::iter);
         f.debug_set().entries(iter).finish()
     }
 }
@@ -99,21 +106,45 @@ impl VariableAssignments {
 }
 
 impl Program {
-    pub fn big_step_inference(&self, r2v2d: &RuleToVidToDid, neg: &Knowledge) -> Knowledge {
+    fn big_step_inference(
+        &self,
+        r2v2d: &RuleToVidToDid,
+        not_neg: &Knowledge,
+        pos_w: &mut Knowledge,
+    ) -> Knowledge {
+        assert!(pos_w.map.is_empty());
         let mut pos_r = Knowledge::default();
-        let mut pos_w = Knowledge::default();
         loop {
             for (sidx, statement) in self.statements.iter().enumerate() {
                 if let Statement::Rule(rule) = statement {
                     let v2d = r2v2d.get(&sidx).expect("wah");
-                    rule.inference_stage(v2d, neg, &pos_r, &mut pos_w);
+                    rule.inference_stage(v2d, not_neg, &pos_r, pos_w);
                 }
             }
-            let changed = pos_r.absorb_all(&mut pos_w);
-            println!("POS SO FAR {:?}", pos_r);
+            let changed = pos_r.absorb_all(pos_w);
+            // println!("POS SO FAR {:?}", pos_r);
             if !changed {
+                assert!(pos_w.map.is_empty());
                 return pos_r;
             }
+        }
+    }
+
+    pub fn denotation(&self, r2v2d: &RuleToVidToDid) -> Denotation {
+        let mut pos_w = Knowledge::default();
+        let mut interpretations = vec![Knowledge::default()];
+        loop {
+            if interpretations.len() % 2 == 0 {
+                if let [.., a, b, c, d] = interpretations.as_mut_slice() {
+                    if a == c && b == d {
+                        use std::mem::take;
+                        return Denotation { pos: take(d), unk: take(c) };
+                    }
+                }
+            }
+            let not_neg = interpretations.iter().last().unwrap();
+            let pos = self.big_step_inference(r2v2d, not_neg, &mut pos_w);
+            interpretations.push(pos);
         }
     }
 }
@@ -182,7 +213,7 @@ impl Rule {
     fn inference_stage_rec(
         &self,
         v2d: &VidToDid,
-        neg: &Knowledge,
+        not_neg: &Knowledge,
         pos_r: &Knowledge,
         pos_w: &mut Knowledge,
         va: &mut VariableAssignments,
@@ -198,7 +229,7 @@ impl Rule {
                         match antecedent.sign {
                             Sign::Pos => todo!(),
                             Sign::Neg => {
-                                if !neg.contains(did, &atom) {
+                                if not_neg.contains(did, &atom) {
                                     break;
                                 }
                             }
@@ -216,30 +247,30 @@ impl Rule {
                 Some(did) => {
                     assert_eq!(head.sign, Sign::Pos);
                     for atom in pos_r.iter_did(did) {
-                        println!("ASSIGN_BEFORE {:?}", va);
+                        // println!("ASSIGN_BEFORE {:?}", va);
 
                         let state_token = va.get_state_token();
                         if atom.uniquely_assign_variables(&head.ra, va).is_err() {
                             break;
                         }
-                        println!("AFTER {:?}", va);
-                        self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail);
+                        // println!("AFTER {:?}", va);
+                        self.inference_stage_rec(v2d, not_neg, pos_r, pos_w, va, new_tail);
                         va.restore_state(state_token).expect("oh no");
                     }
                 }
-                None => self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail),
+                None => self.inference_stage_rec(v2d, not_neg, pos_r, pos_w, va, new_tail),
             },
         }
     }
     fn inference_stage(
         &self,
         v2d: &VidToDid,
-        neg: &Knowledge,
+        not_neg: &Knowledge,
         pos_r: &Knowledge,
         pos_w: &mut Knowledge,
     ) {
         let mut va = VariableAssignments::default();
-        dbg!(self);
-        self.inference_stage_rec(v2d, neg, pos_r, pos_w, &mut va, &self.antecedents)
+        // dbg!(self);
+        self.inference_stage_rec(v2d, not_neg, pos_r, pos_w, &mut va, &self.antecedents)
     }
 }

@@ -17,8 +17,7 @@ fn main() -> Result<(), ()> {
     dbg!(&check_result);
     let r2v2d = check_result.map_err(drop)?;
     dbg!(program.seal_break());
-    let neg = dynamics::Knowledge::default();
-    let pos = program.big_step_inference(&r2v2d, &neg);
-    dbg!(&pos);
+    let den = program.denotation(&r2v2d);
+    println!("pos: {:?}\nunk: {:?}", &den.pos, &den.unk);
     Ok(())
 }

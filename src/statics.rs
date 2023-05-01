@@ -1,11 +1,6 @@
 use crate::ast::*;
-use core::ops::Range;
-use std::collections::{HashMap, HashSet};
 
-// enum DeconstructionErr {
-//     UndefinedConstructor { did: DomainId },
-//     ArgsParamsArityMismatch { did: DomainId, args: usize, params: usize },
-// }
+use std::collections::{HashMap, HashSet};
 
 type ParamsMap = HashMap<DomainId, (StatementIdx, Vec<DomainId>)>;
 
@@ -31,16 +26,6 @@ pub enum VidToDidErr {
     NoTypes { vid: VariableId },
     WrongArity { did: DomainId, params: usize, args: usize },
     VariableNotEnumerable { vid: VariableId },
-}
-
-trait OnlyIf: Sized {
-    fn only_if(self, b: bool) -> Option<Self> {
-        if b {
-            Some(self)
-        } else {
-            None
-        }
-    }
 }
 
 #[derive(Debug)]
