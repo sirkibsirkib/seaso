@@ -11,25 +11,27 @@ pub type VidToDid = HashMap<VariableId, DomainId>;
 #[derive(Debug)]
 pub struct CheckErr {
     pub sidx: StatementIdx,
-    pub err: RuleCheckErr,
+    pub err: StmtCheckErr,
 }
 
 #[derive(Debug)]
-pub enum RuleCheckErr {
+pub enum StmtCheckErr {
     UndefinedConstructor { did: DomainId },
-    MultipleTypes { vid: VariableId, domains: [DomainId; 2] },
+    OneVariableTwoTypes { vid: VariableId, domains: [DomainId; 2] },
     NoTypes { vid: VariableId },
-    WrongArity { did: DomainId, params: usize, args: usize },
+    WrongArity { did: DomainId, param_count: usize, args: usize },
     VariableNotEnumerable { vid: VariableId },
     PrimitiveConsequent { did: DomainId },
     PrimitiveAntecedent { did: DomainId },
     ConflictingDefinition { did: DomainId, previous_sidx: StatementIdx },
+    MistypedArgument { constructor: DomainId, expected: DomainId, got: DomainId },
 }
 
 #[derive(Debug)]
 pub struct SealBreak {
     pub sealed: StatementIdx,
     pub modified: StatementIdx,
+    pub did: DomainId,
 }
 
 impl Program {
@@ -42,7 +44,10 @@ impl Program {
             })
             .collect()
     }
-    pub fn check(&self) -> Result<RuleToVidToDid, CheckErr> {
+    pub fn check(&self) -> Result<RuleToVidToDid, (&Statement, CheckErr)> {
+        self.check_inner().map_err(|e| (&self.statements[e.sidx], e))
+    }
+    pub fn check_inner(&self) -> Result<RuleToVidToDid, CheckErr> {
         // step 1: no duplicate domain definitions
         let pm = self.new_params_map()?;
 
@@ -50,7 +55,7 @@ impl Program {
         let declarations = self.declarations();
         for (sidx, statement) in self.statements.iter().enumerate() {
             if let Some(did) = statement.undeclared_domain_id(&declarations) {
-                return Err(CheckErr { sidx, err: RuleCheckErr::UndefinedConstructor { did } });
+                return Err(CheckErr { sidx, err: StmtCheckErr::UndefinedConstructor { did } });
             }
         }
 
@@ -77,14 +82,22 @@ impl Program {
                     for consequent in consequents {
                         if let RuleAtom::Construct { did, .. } = consequent {
                             if let Some(&s_sidx) = sfa.get(did) {
-                                return Some(SealBreak { sealed: s_sidx, modified: sidx });
+                                return Some(SealBreak {
+                                    sealed: s_sidx,
+                                    modified: sidx,
+                                    did: did.clone(),
+                                });
                             }
                         }
                     }
                 }
                 Statement::Emit { did } => {
                     if let Some(&s_sidx) = sfa.get(did) {
-                        return Some(SealBreak { sealed: s_sidx, modified: sidx });
+                        return Some(SealBreak {
+                            sealed: s_sidx,
+                            modified: sidx,
+                            did: did.clone(),
+                        });
                     }
                 }
                 _ => {}
@@ -104,7 +117,7 @@ impl Program {
                     if &previous_params != params {
                         return Err(CheckErr {
                             sidx,
-                            err: RuleCheckErr::ConflictingDefinition {
+                            err: StmtCheckErr::ConflictingDefinition {
                                 previous_sidx,
                                 did: did.clone(),
                             },
@@ -154,7 +167,7 @@ impl Statement {
                 .flatten(),
         }
     }
-    fn rule_typing(&self, pm: &ParamsMap) -> Option<Result<VidToDid, RuleCheckErr>> {
+    fn rule_typing(&self, pm: &ParamsMap) -> Option<Result<VidToDid, StmtCheckErr>> {
         match self {
             Statement::Rule(Rule { consequents, antecedents }) => {
                 let mut v2d = VidToDid::default();
@@ -166,7 +179,7 @@ impl Statement {
                     }
                 }
                 Some(if let Some(vid) = vids.iter().find(|&vid| !v2d.contains_key(vid)) {
-                    Err(RuleCheckErr::NoTypes { vid: vid.clone() })
+                    Err(StmtCheckErr::NoTypes { vid: vid.clone() })
                 } else {
                     // enumerability check
                     let mut enumerable = HashSet::default();
@@ -176,7 +189,7 @@ impl Statement {
                     for consequent in consequents.iter() {
                         let did = consequent.domain_id(&v2d).unwrap();
                         if did.is_primitive() {
-                            return Some(Err(RuleCheckErr::PrimitiveConsequent {
+                            return Some(Err(StmtCheckErr::PrimitiveConsequent {
                                 did: did.clone(),
                             }));
                         }
@@ -184,13 +197,13 @@ impl Statement {
                     for antecedent in antecedents.iter() {
                         let did = antecedent.ra.domain_id(&v2d).unwrap();
                         if did.is_primitive() {
-                            return Some(Err(RuleCheckErr::PrimitiveAntecedent {
+                            return Some(Err(StmtCheckErr::PrimitiveAntecedent {
                                 did: did.clone(),
                             }));
                         }
                     }
                     if let Some(vid) = vids.difference(&enumerable).next() {
-                        Err(RuleCheckErr::VariableNotEnumerable { vid: vid.clone() })
+                        Err(StmtCheckErr::VariableNotEnumerable { vid: vid.clone() })
                     } else {
                         Ok(v2d)
                     }
@@ -201,29 +214,56 @@ impl Statement {
     }
 }
 
+impl Constant {
+    fn did(&self) -> DomainId {
+        DomainId(
+            match self {
+                Self::Int { .. } => "int",
+                Self::Str { .. } => "str",
+            }
+            .to_owned(),
+        )
+    }
+}
+
 impl RuleAtom {
-    fn typing(&self, pm: &ParamsMap, v2d: &mut VidToDid) -> Result<(), RuleCheckErr> {
+    fn apparent_did(&self) -> Option<DomainId> {
+        match self {
+            RuleAtom::Construct { did, .. } => Some(did.clone()),
+            RuleAtom::Constant { c } => Some(c.did()),
+            RuleAtom::Variable { .. } => None,
+        }
+    }
+    fn typing(&self, pm: &ParamsMap, v2d: &mut VidToDid) -> Result<(), StmtCheckErr> {
         match self {
             RuleAtom::Construct { did, args } => {
-                let (_defn_sidx, params) =
-                    pm.get(did).ok_or(RuleCheckErr::UndefinedConstructor { did: did.clone() })?;
-                if params.len() != args.len() {
-                    return Err(RuleCheckErr::WrongArity {
+                let (_defn_sidx, param_dids) =
+                    pm.get(did).ok_or(StmtCheckErr::UndefinedConstructor { did: did.clone() })?;
+                if param_dids.len() != args.len() {
+                    return Err(StmtCheckErr::WrongArity {
                         did: did.clone(),
-                        params: params.len(),
+                        param_count: param_dids.len(),
                         args: args.len(),
                     });
                 }
-                for (arg, param) in args.iter().zip(params.iter()) {
+                for (arg, param_did) in args.iter().zip(param_dids.iter()) {
                     if let RuleAtom::Variable { vid } = arg {
-                        match v2d.insert(vid.clone(), param.clone()) {
-                            Some(param2) if param != &param2 => {
-                                return Err(RuleCheckErr::MultipleTypes {
+                        match v2d.insert(vid.clone(), param_did.clone()) {
+                            Some(param_did2) if param_did != &param_did2 => {
+                                return Err(StmtCheckErr::OneVariableTwoTypes {
                                     vid: vid.clone(),
-                                    domains: [param.clone(), param2.clone()],
+                                    domains: [param_did.clone(), param_did2.clone()],
                                 });
                             }
                             _ => {}
+                        }
+                    } else if let Some(arg_did) = arg.apparent_did() {
+                        if &arg_did != param_did {
+                            return Err(StmtCheckErr::MistypedArgument {
+                                constructor: did.clone(),
+                                expected: param_did.clone(),
+                                got: arg_did,
+                            });
                         }
                     }
                 }

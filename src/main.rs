@@ -35,7 +35,7 @@ fn main() -> Result<(), ()> {
             );
         }
         println!("seal broken: {:?}", program.seal_break());
-        println!("check result {:?}", check_result.as_ref().map(drop));
+        println!("check result {:#?}", check_result.as_ref().map(drop));
     }
     println!("parse result {:?}", parse_result.as_ref().map(drop));
     Ok(())

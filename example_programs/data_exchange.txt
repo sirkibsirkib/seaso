@@ -44,8 +44,8 @@ rule A, C :- accessor(A,C).
 defn role(str). playRole(agent,role,context).
 rule playRole(A,role("accessor"),C) :- accessor(A,C).
      playRole(A,role("consumer"),C) :- consumer(A,C).
-     accessor(A,C) :- playRole(A,"accessor",C).
-     consumer(A,C) :- playRole(A,"consumer",C).
+     accessor(A,C) :- playRole(A,role("accessor"),C).
+     consumer(A,C) :- playRole(A,role("consumer"),C).
 
 defn computation(context).
 defn computer(agent,context).
@@ -72,7 +72,7 @@ rule notPlanned(H) :- H, !isPlanned(H).
      :- happens(compute(A,computation(Ctx))), !computer(A,Ctx).
     
 defn context(str). workflow(str).
-rule computer(agent("Amy"),computation(context("Ctx1"))).
+rule orgA(agent("Amy"),context("Ctx1")).
      happens(compute(agent("Amy"),computation(context("Ctx1")))).
 
 rule planned(task(workflow("W1"),computation(context("Ctx1"))),agent("Amy")).
@@ -82,6 +82,6 @@ defn before(happens,happens).
 emit recompute.
 rule before(X,Z) :- before(X,Y), before(Y,Z).
      recompute(A2,D)
-     :- before(compute(A1,C1),compute(A2,C2)),
+     :- before(happens(compute(A1,C1)),happens(compute(A2,C2))),
         output(C1,D), happens(compute(A1,C1)),
         output(C2,D), happens(compute(A2,C2)).
