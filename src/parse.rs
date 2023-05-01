@@ -119,31 +119,23 @@ fn id_suffix(i: &str) -> IResult<&str, &str> {
 }
 
 fn domain_id(i: &str) -> IResult<&str, DomainId> {
-    let (i, ident) = ws(recognize(pair(satisfy(|c| c.is_ascii_lowercase()), id_suffix)))(i)?;
-    Ok((i, DomainId(ident.to_owned())))
-}
-
-fn variable_id(i: &str) -> IResult<&str, VariableId> {
-    let (i, ident) = ws(recognize(pair(satisfy(|c| c.is_ascii_uppercase()), id_suffix)))(i)?;
-    Ok((i, VariableId(ident.to_owned())))
+    let did = recognize(pair(satisfy(|c| c.is_ascii_lowercase()), id_suffix));
+    nommap(ws(did), |ident| DomainId(ident.to_owned()))(i)
 }
 
 fn variable(i: &str) -> IResult<&str, RuleAtom> {
+    let vid = recognize(pair(satisfy(|c| c.is_ascii_uppercase()), id_suffix));
+    let variable_id = nommap(ws(vid), |ident| VariableId(ident.to_owned()));
     nommap(variable_id, |vid| RuleAtom::Variable { vid })(i)
 }
 
 fn constant(i: &str) -> IResult<&str, RuleAtom> {
+    let int_constant = nommap(nomi64, |c| Constant::Int(c));
+    let str_constant = nommap(
+        delimited(tag("\""), recognize(many0_count(none_of("\""))), tag("\"")),
+        |c: &str| Constant::Str(c.to_owned()),
+    );
     nommap(ws(alt((int_constant, str_constant))), |c| RuleAtom::Constant { c })(i)
-}
-
-fn int_constant(i: &str) -> IResult<&str, Constant> {
-    nommap(nomi64, |c| Constant::Int(c))(i)
-}
-
-fn str_constant(i: &str) -> IResult<&str, Constant> {
-    nommap(delimited(tag("\""), recognize(many0_count(none_of("\""))), tag("\"")), |c: &str| {
-        Constant::Str(c.to_owned())
-    })(i)
 }
 
 fn construct(i: &str) -> IResult<&str, RuleAtom> {
