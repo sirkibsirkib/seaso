@@ -200,8 +200,14 @@ impl Atom {
                     Err(())
                 }
             }
-            (Atom::Constant { c: c1 }, RuleAtom::Constant { c: c2 }) if c1 == c2 => Ok(()),
-            _ => todo!(),
+            (Atom::Constant { c: c1 }, RuleAtom::Constant { c: c2 }) => {
+                if c1 == c2 {
+                    Ok(())
+                } else {
+                    Err(())
+                }
+            }
+            (x, y) => panic!("{:?}", (x, y)),
         }
     }
 }
@@ -232,25 +238,29 @@ impl Rule {
         match tail {
             [] => {
                 // perform all checks
-                for antecedent in self.antecedents.iter() {
+                let checks_pass = self.antecedents.iter().all(|antecedent| {
                     let did = antecedent.ra.domain_id(v2d).expect("static checked");
                     if antecedent.is_enumerable_in(v2d).is_none() {
                         let atom = antecedent.ra.concretize(va).expect("should work");
                         match antecedent.sign {
                             Sign::Pos => todo!(),
                             Sign::Neg => {
-                                if !neg.contains(did, &atom) {
-                                    break;
-                                }
+                                let res = neg.contains(did, &atom);
+                                dbg!(pos_r, atom, res);
+                                res
                             }
                         }
+                    } else {
+                        true
                     }
-                }
-                // all checks passed
-                for consequent in self.consequents.iter() {
-                    let did = consequent.domain_id(v2d).expect("static checked");
-                    let atom = consequent.concretize(va).expect("should work");
-                    pos_w.insert(did, atom);
+                });
+                if checks_pass {
+                    // all checks passed
+                    for consequent in self.consequents.iter() {
+                        let did = consequent.domain_id(v2d).expect("static checked");
+                        let atom = consequent.concretize(va).expect("should work");
+                        pos_w.insert(did, atom);
+                    }
                 }
             }
             [head, new_tail @ ..] => match head.is_enumerable_in(v2d) {

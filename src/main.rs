@@ -5,10 +5,16 @@ mod parse;
 mod statics;
 
 fn main() -> Result<(), ()> {
+    // let source = "
+    // defn x(int). y(int,int). z(int,int).
+    // rule z(1,0). y(A,B) :- x(A), x(B), !z(A,B).
+    //      x(L), x(R) :- z(L,R).
+    // ";
     let source = "
-    defn x(int). y(int,int). z(int,int).
-    rule z(2,3). y(A,B) :- x(A), x(B), !z(A,B).
-         x(L), x(R) :- z(L,R).
+    defn x(int).
+    rule x(1) :- x(3), !x(2).
+         x(2) :- !x(1).
+         x(3).
     ";
     let parse_result = parse::program(source);
     dbg!(&parse_result);
