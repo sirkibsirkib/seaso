@@ -67,9 +67,9 @@ defn happens(compute). isPlanned(happens).
 emit notPlanned. prohibited.
 rule notPlanned(H) :- H, !isPlanned(H).
      isPlanned(happens(compute(A,C)))
-       :- happens(compute(A,C)), planned(task(W,C),A).
+     :- happens(compute(A,C)), planned(task(W,C),A).
      prohibited(happens(compute(A,computation(Ctx))))
-       :- happens(compute(A,computation(Ctx))), !computer(A,Ctx).
+     :- happens(compute(A,computation(Ctx))), !computer(A,Ctx).
     
 defn context(str). workflow(str).
 rule computer(agent("Amy"),computation(context("Ctx1"))).
@@ -77,12 +77,11 @@ rule computer(agent("Amy"),computation(context("Ctx1"))).
 
 rule planned(task(workflow("W1"),computation(context("Ctx1"))),agent("Amy")).
 
-
 defn before(happens,happens).
      recompute(agent,data).
 emit recompute.
 rule before(X,Z) :- before(X,Y), before(Y,Z).
-     recompute(A2,D) :-
-        before(compute(A1,C1),compute(A2,C2)),
+     recompute(A2,D)
+     :- before(compute(A1,C1),compute(A2,C2)),
         output(C1,D), happens(compute(A1,C1)),
         output(C2,D), happens(compute(A2,C2)).
