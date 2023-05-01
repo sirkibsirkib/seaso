@@ -17,15 +17,17 @@ pub type VidToDid = HashMap<VariableId, DomainId>;
 pub enum CheckErr {
     ParamsMapErr(ParamsMapErr),
     UndefinedConstructor { sidx: StatementIdx, did: DomainId },
-    VidToDidErr { sidx: StatementIdx, err: VidToDidErr },
+    RuleCheckErr { sidx: StatementIdx, err: RuleCheckErr },
 }
 #[derive(Debug)]
-pub enum VidToDidErr {
+pub enum RuleCheckErr {
     UndefinedConstructor { did: DomainId },
     MultipleTypes { vid: VariableId, domains: [DomainId; 2] },
     NoTypes { vid: VariableId },
     WrongArity { did: DomainId, params: usize, args: usize },
     VariableNotEnumerable { vid: VariableId },
+    PrimitiveConsequent { did: DomainId },
+    PrimitiveAntecedent { did: DomainId },
 }
 
 #[derive(Debug)]
@@ -53,7 +55,7 @@ impl Program {
             .enumerate()
             .flat_map(|(sidx, statement)| {
                 statement.rule_typing(&pm).map(|x| {
-                    x.map(|x| (sidx, x)).map_err(|err| CheckErr::VidToDidErr { sidx, err })
+                    x.map(|x| (sidx, x)).map_err(|err| CheckErr::RuleCheckErr { sidx, err })
                 })
             })
             .collect()
@@ -112,7 +114,7 @@ impl Program {
 impl DomainId {
     fn is_primitive(&self) -> bool {
         match self.0.as_ref() {
-            "int" | "str" | "eq" => true,
+            "int" | "str" => true,
             _ => false,
         }
     }
@@ -137,7 +139,7 @@ impl Statement {
                 .flatten(),
         }
     }
-    fn rule_typing(&self, pm: &ParamsMap) -> Option<Result<VidToDid, VidToDidErr>> {
+    fn rule_typing(&self, pm: &ParamsMap) -> Option<Result<VidToDid, RuleCheckErr>> {
         match self {
             Statement::Rule(Rule { consequents, antecedents }) => {
                 let mut v2d = VidToDid::default();
@@ -149,15 +151,31 @@ impl Statement {
                     }
                 }
                 Some(if let Some(vid) = vids.iter().find(|&vid| !v2d.contains_key(vid)) {
-                    Err(VidToDidErr::NoTypes { vid: vid.clone() })
+                    Err(RuleCheckErr::NoTypes { vid: vid.clone() })
                 } else {
                     // enumerability check
                     let mut enumerable = HashSet::default();
                     for antecedent in antecedents {
                         antecedent.variables_if_enumerable(&v2d, &mut enumerable);
                     }
+                    for consequent in consequents.iter() {
+                        let did = consequent.domain_id(&v2d).unwrap();
+                        if did.is_primitive() {
+                            return Some(Err(RuleCheckErr::PrimitiveConsequent {
+                                did: did.clone(),
+                            }));
+                        }
+                    }
+                    for antecedent in antecedents.iter() {
+                        let did = antecedent.ra.domain_id(&v2d).unwrap();
+                        if did.is_primitive() {
+                            return Some(Err(RuleCheckErr::PrimitiveAntecedent {
+                                did: did.clone(),
+                            }));
+                        }
+                    }
                     if let Some(vid) = vids.difference(&enumerable).next() {
-                        Err(VidToDidErr::VariableNotEnumerable { vid: vid.clone() })
+                        Err(RuleCheckErr::VariableNotEnumerable { vid: vid.clone() })
                     } else {
                         Ok(v2d)
                     }
@@ -169,13 +187,13 @@ impl Statement {
 }
 
 impl RuleAtom {
-    fn typing(&self, pm: &ParamsMap, v2d: &mut VidToDid) -> Result<(), VidToDidErr> {
+    fn typing(&self, pm: &ParamsMap, v2d: &mut VidToDid) -> Result<(), RuleCheckErr> {
         match self {
             RuleAtom::Construct { did, args } => {
                 let (_defn_sidx, params) =
-                    pm.get(did).ok_or(VidToDidErr::UndefinedConstructor { did: did.clone() })?;
+                    pm.get(did).ok_or(RuleCheckErr::UndefinedConstructor { did: did.clone() })?;
                 if params.len() != args.len() {
-                    return Err(VidToDidErr::WrongArity {
+                    return Err(RuleCheckErr::WrongArity {
                         did: did.clone(),
                         params: params.len(),
                         args: args.len(),
@@ -185,7 +203,7 @@ impl RuleAtom {
                     if let RuleAtom::Variable { vid } = arg {
                         match v2d.insert(vid.clone(), param.clone()) {
                             Some(param2) if param != &param2 => {
-                                return Err(VidToDidErr::MultipleTypes {
+                                return Err(RuleCheckErr::MultipleTypes {
                                     vid: vid.clone(),
                                     domains: [param.clone(), param2.clone()],
                                 });
