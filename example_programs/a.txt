@@ -1,0 +1,3 @@
+defn x(int). y(int,int). z(int,int).
+rule z(8,9). y(A,B) :- x(A), x(B), !z(A,B).
+     x(L), x(R) :- z(L,R).
