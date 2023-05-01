@@ -1,7 +1,6 @@
 use std::io::Read;
 use std::time::Instant;
 mod ast;
-// mod data_structures;
 mod dynamics;
 mod parse;
 mod statics;
@@ -15,18 +14,6 @@ fn stdin_to_string() -> Result<String, std::io::Error> {
 
 fn main() -> Result<(), ()> {
     let source = stdin_to_string().expect("bad stdin");
-
-    // let source = "
-    // defn x(int). y(int,int). z(int,int).
-    // rule z(1,0). y(A,B) :- x(A), x(B), !z(A,B).
-    //      x(L), x(R) :- z(L,R).
-    // ";
-    // let source = "
-    // defn x(int).
-    // rule x(1) :-        !x(2), x(3).
-    //      x(2) :- !x(1).
-    //      x(3).
-    // ";
     let start_i0 = Instant::now();
     let parse_result = parse::program(&source);
     let start_i1 = Instant::now();
@@ -45,8 +32,8 @@ fn main() -> Result<(), ()> {
             println!("Denotation:\n  pos: {:?}\n  unk: {:?}", &den.pos, &den.unk);
         }
         println!("seal broken: {:?}", program.seal_break());
-        println!("check result {:?}", check_result.as_ref().map(|_| ()));
+        println!("check result {:?}", check_result.as_ref().map(drop));
     }
-    println!("parse result {:?}", parse_result.as_ref().map(|_| ()));
+    println!("parse result {:?}", parse_result.as_ref().map(drop));
     Ok(())
 }
