@@ -61,17 +61,24 @@ where
     delimited(ws(tag("(")), commasep(inner), ws(tag(")")))
 }
 
+fn stmt<'a, F: FnMut(&'a str) -> IResult<&'a str, Statement> + 'a>(
+    string: &'a str,
+    inner: F,
+) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<Statement>> + 'a {
+    preceded(ws(tag(string)), many0(terminated(inner, ws(tag(".")))))
+}
+
 ////////// STATEMENT PARSERS //////////
 
 pub fn program(mut i: &str) -> IResult<&str, Program> {
     let mut program = Program::default();
     while !i.is_empty() {
         let (i2, statements) = alt((
-            preceded(ws(tag("decl")), many0(terminated(decl, ws(tag("."))))),
-            preceded(ws(tag("defn")), many0(terminated(defn, ws(tag("."))))),
-            preceded(ws(tag("seal")), many0(terminated(seal, ws(tag("."))))),
-            preceded(ws(tag("emit")), many0(terminated(emit, ws(tag("."))))),
-            preceded(ws(tag("rule")), many0(terminated(rule, ws(tag("."))))),
+            stmt("decl", decl),
+            stmt("defn", defn),
+            stmt("seal", seal),
+            stmt("emit", emit),
+            stmt("rule", rule),
         ))(i)?;
         i = i2;
         program.statements.extend(statements)
