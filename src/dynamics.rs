@@ -1,12 +1,11 @@
-use crate::ast::*;
-use crate::statics::RuleToVidToDid;
-use crate::statics::VidToDid;
-
-use std::collections::HashMap;
-use std::collections::HashSet;
+use crate::{
+    ast::*,
+    statics::{RuleToVidToDid, VidToDid},
+};
+use std::collections::{HashMap, HashSet};
 
 /// Concrete counterpart to `RuleAtom` with no domain info
-#[derive(Hash, Eq, PartialEq, Clone)]
+#[derive(Ord, PartialOrd, Hash, Eq, PartialEq, Clone)]
 enum Atom {
     Constant { c: Constant },
     Construct { did: DomainId, args: Vec<Atom> },
@@ -66,8 +65,9 @@ impl std::fmt::Debug for Atom {
 
 impl std::fmt::Debug for Knowledge {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let iter = self.map.values().flat_map(HashSet::iter);
-        f.debug_set().entries(iter).finish()
+        let mut list: Vec<_> = self.map.values().flat_map(HashSet::iter).collect();
+        list.sort();
+        f.debug_set().entries(list).finish()
     }
 }
 
@@ -115,18 +115,19 @@ impl Program {
         r2v2d: &RuleToVidToDid,
         neg: ComplementKnowledge,
         pos_w: &mut Knowledge,
+        va: &mut VariableAssignments,
     ) -> Knowledge {
         assert!(pos_w.map.is_empty());
         let mut pos_r = Knowledge::default();
         loop {
             for (sidx, statement) in self.statements.iter().enumerate() {
                 if let Statement::Rule(rule) = statement {
-                    println!("rule at index {} ...", sidx);
+                    // println!("rule at index {} ...", sidx);
                     let v2d = r2v2d.get(&sidx).expect("wah");
-                    rule.inference_stage(v2d, neg, &pos_r, pos_w);
+                    rule.inference_stage(v2d, neg, &pos_r, pos_w, va);
                 }
             }
-            println!("absorbing {:?} <= {:?}", pos_r, pos_w);
+            // println!("absorbing {:?} <= {:?}", pos_r, pos_w);
             let changed = pos_r.absorb_all(pos_w);
             if !changed {
                 assert!(pos_w.map.is_empty());
@@ -137,10 +138,11 @@ impl Program {
 
     pub fn denotation(&self, r2v2d: &RuleToVidToDid) -> Denotation {
         let mut pos_w = Knowledge::default();
+        let mut va = VariableAssignments::default();
         let mut interpretations =
-            vec![self.big_step_inference(r2v2d, ComplementKnowledge::Empty, &mut pos_w)];
+            vec![self.big_step_inference(r2v2d, ComplementKnowledge::Empty, &mut pos_w, &mut va)];
         loop {
-            println!("\n>>>>>> INTERPRTATIONS: {:?}", &interpretations);
+            // println!("\n>>>>>> INTERPRTATIONS: {:?}", &interpretations);
             if interpretations.len() >= 8 && interpretations.len() % 2 == 1 {
                 if let [.., a, b, c, d] = interpretations.as_mut_slice() {
                     if a == c && b == d {
@@ -155,7 +157,7 @@ impl Program {
                 }
             }
             let neg = ComplementKnowledge::ComplementOf(interpretations.iter().last().unwrap());
-            let pos = self.big_step_inference(r2v2d, neg, &mut pos_w);
+            let pos = self.big_step_inference(r2v2d, neg, &mut pos_w, &mut va);
             interpretations.push(pos);
         }
     }
@@ -190,7 +192,7 @@ impl Atom {
         ra: &RuleAtom,
         va: &mut VariableAssignments,
     ) -> Result<(), ()> {
-        println!("{:?}", (self, ra));
+        // println!("{:?}", (self, ra));
         match (self, ra) {
             (atom1, RuleAtom::Variable { vid }) => va.insert(vid, atom1.clone()),
             (Atom::Construct { args: atoms, .. }, RuleAtom::Construct { args: rule_atoms, .. }) => {
@@ -235,10 +237,12 @@ impl Rule {
         neg: ComplementKnowledge,
         pos_r: &Knowledge,
         pos_w: &mut Knowledge,
+        va: &mut VariableAssignments,
     ) {
-        let mut va = VariableAssignments::default();
+        // let mut va = VariableAssignments::default();
         // dbg!(self);
-        self.inference_stage_rec(v2d, neg, pos_r, pos_w, &mut va, &self.antecedents)
+        self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, &self.antecedents);
+        va.assignments.clear();
     }
 
     fn inference_stage_rec(
@@ -253,17 +257,17 @@ impl Rule {
         match tail {
             [] => {
                 // for debugging...
-                print!("CONCRETE RULE ");
-                for consequent in self.consequents.iter() {
-                    let atom = consequent.concretize(va).expect("should work");
-                    print!("{:?} ", atom);
-                }
-                print!(":- ");
-                for antecedent in self.antecedents.iter() {
-                    let atom = antecedent.ra.concretize(va).expect("should work");
-                    print!("{}{:?} ", (if antecedent.sign == Sign::Pos { "" } else { "!" }), atom);
-                }
-                println!();
+                // print!("CONCRETE RULE ");
+                // for consequent in self.consequents.iter() {
+                //     let atom = consequent.concretize(va).expect("should work");
+                //     print!("{:?} ", atom);
+                // }
+                // print!(":- ");
+                // for antecedent in self.antecedents.iter() {
+                //     let atom = antecedent.ra.concretize(va).expect("should work");
+                //     print!("{}{:?} ", (if antecedent.sign == Sign::Pos { "" } else { "!" }), atom);
+                // }
+                // println!();
                 // perform all checks
                 let checks_pass = self.antecedents.iter().all(|antecedent| {
                     let did = antecedent.ra.domain_id(v2d).expect("static checked");
@@ -273,10 +277,10 @@ impl Rule {
                             Sign::Pos => todo!(),
                             Sign::Neg => {
                                 let res = neg.contains(did, &atom);
-                                println!(
-                                    "neg:{:?} pos_r:{:?} atom:{:?} check_res:{:?}",
-                                    neg, pos_r, atom, res
-                                );
+                                // println!(
+                                //     "neg:{:?} pos_r:{:?} atom:{:?} check_res:{:?}",
+                                //     neg, pos_r, atom, res
+                                // );
                                 res
                             }
                         }
@@ -290,7 +294,7 @@ impl Rule {
                     for consequent in self.consequents.iter() {
                         let did = consequent.domain_id(v2d).expect("static checked");
                         let atom = consequent.concretize(va).expect("should work");
-                        println!("!! inserting {:?} {:?}", did, atom);
+                        // println!("!! inserting {:?} {:?}", did, atom);
                         pos_w.insert(did, atom);
                     }
                 }
@@ -300,11 +304,11 @@ impl Rule {
                     // bind all true atoms that match!
                     assert_eq!(head.sign, Sign::Pos);
                     for atom in pos_r.iter_did(did) {
-                        // println!("ASSIGN_BEFORE {:?}", va);
+                        // // println!("ASSIGN_BEFORE {:?}", va);
 
                         let state_token = va.get_state_token();
                         if atom.uniquely_assign_variables(&head.ra, va).is_ok() {
-                            // println!("AFTER {:?}", va);
+                            // // println!("AFTER {:?}", va);
                             self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail);
                         }
                         va.restore_state(state_token).expect("oh no");

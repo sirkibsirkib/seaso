@@ -1,12 +1,12 @@
 pub type StatementIdx = usize;
 
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+#[derive(Ord, PartialOrd, Debug, Clone, PartialEq, Hash, Eq)]
 pub struct DomainId(pub String);
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub struct VariableId(pub String);
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Ord, PartialOrd, Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Constant {
     Int(i64),
     Str(String),
