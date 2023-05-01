@@ -3,10 +3,7 @@ use crate::ast::*;
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::{
-        complete::i64 as nomi64,
-        complete::{alphanumeric1, multispace0, none_of, satisfy},
-    },
+    character::complete::{alphanumeric1, i64 as nomi64, multispace0, none_of, satisfy},
     combinator::{map as nommap, opt, recognize},
     error::ParseError,
     multi::{many0, many0_count, separated_list0},
@@ -68,7 +65,7 @@ fn stmt<'a, F: FnMut(&'a str) -> IResult<&'a str, Statement> + 'a>(
     preceded(ws(tag(string)), many0(terminated(inner, ws(tag(".")))))
 }
 
-////////// STATEMENT PARSERS //////////
+////////// STATEMENT-LEVEL PARSERS //////////
 
 pub fn program(mut i: &str) -> IResult<&str, Program> {
     let mut program = Program::default();
@@ -104,15 +101,16 @@ fn defn(i: &str) -> IResult<&str, Statement> {
 }
 
 fn rule(i: &str) -> IResult<&str, Statement> {
-    let (i, consequents) = commasep(rule_atom)(i)?;
-    let (i, antecedents) = alt((
+    let c = commasep(rule_atom);
+    let a = alt((
         preceded(ws(tag(":-")), commasep(rule_literal)),
         nommap(multispace0, |_| Vec::default()),
-    ))(i)?;
+    ));
+    let (i, (consequents, antecedents)) = pair(c, a)(i)?;
     Ok((i, Statement::Rule(Rule { consequents, antecedents })))
 }
 
-////////// (SUB)EXPRESSION PARSERS //////////
+////////// (SUB)EXPRESSION-LEVEL PARSERS //////////
 
 fn id_suffix(i: &str) -> IResult<&str, &str> {
     recognize(many0_count(alt((tag("_"), alphanumeric1))))(i)
@@ -139,8 +137,8 @@ fn constant(i: &str) -> IResult<&str, RuleAtom> {
 }
 
 fn construct(i: &str) -> IResult<&str, RuleAtom> {
-    let (i, (did, args)) = pair(domain_id, list(rule_atom))(i)?;
-    Ok((i, RuleAtom::Construct { did, args }))
+    let pair = pair(domain_id, list(rule_atom));
+    nommap(pair, |(did, args)| RuleAtom::Construct { did, args })(i)
 }
 
 fn rule_atom(i: &str) -> IResult<&str, RuleAtom> {

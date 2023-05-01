@@ -1,8 +1,15 @@
+/// Used elsewhere to identify elements in `Program` values,
+/// e.g., in error messages.
 pub type StatementIdx = usize;
 
+/// Each identifies:
+/// 1. data types,
+/// 2. constructors of values in #1, and
+/// 3. relations whose members are in #1.
 #[derive(Ord, PartialOrd, Debug, Clone, PartialEq, Hash, Eq)]
 pub struct DomainId(pub String);
 
+/// Each identifies a variable. Used in the context of a rule.
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub struct VariableId(pub String);
 
@@ -12,6 +19,8 @@ pub enum Constant {
     Str(String),
 }
 
+/// "Abstract values" as they may contain variables.
+/// See `Atom` (defined in `dynamics.rs`) for the concretized version.
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum RuleAtom {
     Variable { vid: VariableId },

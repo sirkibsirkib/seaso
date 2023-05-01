@@ -2,11 +2,13 @@ use crate::ast::*;
 
 use std::collections::{HashMap, HashSet};
 
-type ParamsMap = HashMap<DomainId, (StatementIdx, Vec<DomainId>)>;
+/// Used (internally) to remember where and how constructors are defined.
+type DomainDefinitions = HashMap<DomainId, (StatementIdx, Vec<DomainId>)>;
 
-type FirstSealedAt = HashMap<DomainId, StatementIdx>;
-pub type RuleToVidToDid = HashMap<StatementIdx, VidToDid>;
-pub type VidToDid = HashMap<VariableId, DomainId>;
+/// These annotate programs to create the internal representation.
+/// Ultimnately, they prescribe exactly one type to each variable in each rule.
+pub type RuleVariableTypes = HashMap<StatementIdx, VariableTypes>;
+pub type VariableTypes = HashMap<VariableId, DomainId>;
 
 #[derive(Debug)]
 pub struct CheckErr {
@@ -25,6 +27,7 @@ pub enum StmtCheckErr {
     PrimitiveAntecedent { did: DomainId },
     ConflictingDefinition { did: DomainId, previous_sidx: StatementIdx },
     MistypedArgument { constructor: DomainId, expected: DomainId, got: DomainId },
+    DefiningPrimitive { did: DomainId },
 }
 
 #[derive(Debug)]
@@ -34,7 +37,12 @@ pub struct SealBreak {
     pub did: DomainId,
 }
 
+impl DomainId {
+    const PRIMITIVE_STRS: [&str; 2] = ["str", "int"];
+}
+
 impl Program {
+    /// Used to filter the truths of the denotation.
     pub fn emitted(&self) -> HashSet<&DomainId> {
         self.statements
             .iter()
@@ -44,44 +52,55 @@ impl Program {
             })
             .collect()
     }
-    pub fn check(&self) -> Result<RuleToVidToDid, (&Statement, CheckErr)> {
+
+    /// Check all well-formedness criteria of this program depended on
+    /// by `denotation`. Returns the assignment of a unique `DomainId`
+    /// per variable per rule. `(Program,RuleVariableTypes)` can be
+    /// understood as the internal representation.
+    /// Note, the other well-formedness criteria can be checked separately,
+    /// e.g., using `undeclared_domains`.
+    pub fn check(&self) -> Result<RuleVariableTypes, (&Statement, CheckErr)> {
         self.check_inner().map_err(|e| (&self.statements[e.sidx], e))
     }
-    pub fn check_inner(&self) -> Result<RuleToVidToDid, CheckErr> {
-        // step 1: no duplicate domain definitions
-        let pm = self.new_params_map()?;
-
-        // step 2: all constructs are declared
-        let declarations = self.declarations();
-        for (sidx, statement) in self.statements.iter().enumerate() {
-            if let Some(did) = statement.undeclared_domain_id(&declarations) {
-                return Err(CheckErr { sidx, err: StmtCheckErr::UndefinedConstructor { did } });
-            }
-        }
-
-        // step 3: check rules and return variable types
+    fn check_inner(&self) -> Result<RuleVariableTypes, CheckErr> {
+        let dd = self.domain_definitions()?;
         self.statements
             .iter()
             .enumerate()
             .flat_map(|(sidx, statement)| {
                 statement
-                    .rule_typing(&pm)
+                    .rule_typing(&dd)
                     .map(|x| x.map(|x| (sidx, x)).map_err(|err| CheckErr { sidx, err }))
             })
             .collect()
     }
 
+    /// Returns all domains used but not declared, which is trivially
+    /// adapted to enforce the `all used types are declared` well-formedness criterion.
+    pub fn undeclared_domains(&self) -> HashSet<&DomainId> {
+        // step 2: all occurring constructs are declared
+        let declared = self.declarations();
+        let mut occurring = HashSet::default();
+        for statement in &self.statements {
+            statement.occurring_domain_ids(&mut occurring)
+        }
+        occurring.retain(|did| !declared.contains(did));
+        occurring
+    }
+
+    /// Checks the `mut-after-seal` well-formedness criterion.
     pub fn seal_break(&self) -> Option<SealBreak> {
-        let mut sfa = FirstSealedAt::default();
+        type LastSealedAt = HashMap<DomainId, StatementIdx>;
+        let mut lsa = LastSealedAt::default();
         for (sidx, statement) in self.statements.iter().enumerate() {
             match statement {
                 Statement::Seal { did } => {
-                    sfa.insert(did.clone(), sidx);
+                    lsa.insert(did.clone(), sidx);
                 }
                 Statement::Rule(Rule { consequents, .. }) => {
                     for consequent in consequents {
                         if let RuleAtom::Construct { did, .. } = consequent {
-                            if let Some(&s_sidx) = sfa.get(did) {
+                            if let Some(&s_sidx) = lsa.get(did) {
                                 return Some(SealBreak {
                                     sealed: s_sidx,
                                     modified: sidx,
@@ -92,7 +111,7 @@ impl Program {
                     }
                 }
                 Statement::Emit { did } => {
-                    if let Some(&s_sidx) = sfa.get(did) {
+                    if let Some(&s_sidx) = lsa.get(did) {
                         return Some(SealBreak {
                             sealed: s_sidx,
                             modified: sidx,
@@ -106,28 +125,36 @@ impl Program {
         None
     }
 
-    fn new_params_map(&self) -> Result<ParamsMap, CheckErr> {
-        let mut pm = ParamsMap::default();
-        for (sidx, statement) in self.statements.iter().enumerate() {
+    /// Returns the unique definition of each defined domain
+    fn domain_definitions(&self) -> Result<DomainDefinitions, CheckErr> {
+        let mut dd = DomainDefinitions::default();
+
+        let mut f = |sidx, statement: &Statement| {
             if let Statement::Defn { did, params } = statement {
+                if did.is_primitive() {
+                    return Err(StmtCheckErr::DefiningPrimitive { did: did.clone() });
+                }
                 let value = (sidx, params.clone());
                 if let Some((previous_sidx, previous_params)) =
-                    pm.insert(did.clone(), value.clone())
+                    dd.insert(did.clone(), value.clone())
                 {
                     if &previous_params != params {
-                        return Err(CheckErr {
-                            sidx,
-                            err: StmtCheckErr::ConflictingDefinition {
-                                previous_sidx,
-                                did: did.clone(),
-                            },
+                        return Err(StmtCheckErr::ConflictingDefinition {
+                            previous_sidx,
+                            did: did.clone(),
                         });
                     }
                 }
             }
+            Ok(())
+        };
+        for (sidx, statement) in self.statements.iter().enumerate() {
+            f(sidx, statement).map_err(|err| CheckErr { sidx, err })?
         }
-        Ok(pm)
+        Ok(dd)
     }
+
+    /// Returns the set of all declared domains
     fn declarations(&self) -> HashSet<DomainId> {
         self.statements
             .iter()
@@ -135,59 +162,53 @@ impl Program {
                 Statement::Decl { did } | Statement::Defn { did, .. } => Some(did.clone()),
                 _ => None,
             })
+            .chain(DomainId::PRIMITIVE_STRS.map(String::from).map(DomainId))
             .collect()
     }
 }
 
 impl DomainId {
     fn is_primitive(&self) -> bool {
-        match self.0.as_ref() {
-            "int" | "str" => true,
-            _ => false,
-        }
+        Self::PRIMITIVE_STRS.as_slice().contains(&self.0.as_ref())
     }
 }
 
 impl Statement {
-    fn undeclared_domain_id(&self, declarations: &HashSet<DomainId>) -> Option<DomainId> {
+    fn occurring_domain_ids<'a>(&'a self, x: &mut HashSet<&'a DomainId>) {
         match self {
-            Statement::Decl { .. } | Statement::Defn { .. } => None,
-            Statement::Emit { did } | Statement::Seal { did } => {
-                if !declarations.contains(did) {
-                    Some(did.clone())
-                } else {
-                    None
+            Statement::Defn { did, params } => {
+                x.insert(did);
+                for param in params {
+                    x.insert(param);
                 }
             }
-            Statement::Rule(Rule { consequents, antecedents }) => consequents
-                .iter()
-                .chain(antecedents.iter().map(|antecedent| &antecedent.ra))
-                .map(|ra| ra.undeclared_domain_id(declarations))
-                .next()
-                .flatten(),
+            Statement::Decl { did } | Statement::Emit { did } | Statement::Seal { did } => {
+                x.insert(did);
+            }
+            Statement::Rule(..) => {}
         }
     }
-    fn rule_typing(&self, pm: &ParamsMap) -> Option<Result<VidToDid, StmtCheckErr>> {
+    fn rule_typing(&self, dd: &DomainDefinitions) -> Option<Result<VariableTypes, StmtCheckErr>> {
         match self {
             Statement::Rule(Rule { consequents, antecedents }) => {
-                let mut v2d = VidToDid::default();
-                let mut vids = Default::default();
+                let mut vt = VariableTypes::default();
+                let mut vids = HashSet::<VariableId>::default();
                 for ra in consequents.iter().chain(antecedents.iter().map(|lit| &lit.ra)) {
                     ra.variables(&mut vids);
-                    if let Err(err) = ra.typing(pm, &mut v2d) {
+                    if let Err(err) = ra.typing(dd, &mut vt) {
                         return Some(Err(err));
                     }
                 }
-                Some(if let Some(vid) = vids.iter().find(|&vid| !v2d.contains_key(vid)) {
+                Some(if let Some(vid) = vids.iter().find(|&vid| !vt.contains_key(vid)) {
                     Err(StmtCheckErr::NoTypes { vid: vid.clone() })
                 } else {
                     // enumerability check
                     let mut enumerable = HashSet::default();
                     for antecedent in antecedents {
-                        antecedent.variables_if_enumerable(&v2d, &mut enumerable);
+                        antecedent.variables_if_enumerable(&vt, &mut enumerable);
                     }
                     for consequent in consequents.iter() {
-                        let did = consequent.domain_id(&v2d).unwrap();
+                        let did = consequent.domain_id(&vt).unwrap();
                         if did.is_primitive() {
                             return Some(Err(StmtCheckErr::PrimitiveConsequent {
                                 did: did.clone(),
@@ -195,7 +216,7 @@ impl Statement {
                         }
                     }
                     for antecedent in antecedents.iter() {
-                        let did = antecedent.ra.domain_id(&v2d).unwrap();
+                        let did = antecedent.ra.domain_id(&vt).unwrap();
                         if did.is_primitive() {
                             return Some(Err(StmtCheckErr::PrimitiveAntecedent {
                                 did: did.clone(),
@@ -205,7 +226,7 @@ impl Statement {
                     if let Some(vid) = vids.difference(&enumerable).next() {
                         Err(StmtCheckErr::VariableNotEnumerable { vid: vid.clone() })
                     } else {
-                        Ok(v2d)
+                        Ok(vt)
                     }
                 })
             }
@@ -215,7 +236,7 @@ impl Statement {
 }
 
 impl Constant {
-    fn did(&self) -> DomainId {
+    fn domain_id(&self) -> DomainId {
         DomainId(
             match self {
                 Self::Int { .. } => "int",
@@ -227,18 +248,29 @@ impl Constant {
 }
 
 impl RuleAtom {
+    // fn occurring_domain_ids<'a>(&'a self, x: &mut HashSet<&'a DomainId>) {
+    //     match self {
+    //         RuleAtom::Construct { did, args } => {
+    //             x.insert(did);
+    //             for arg in args {
+    //                 arg.occurring_domain_ids(x)
+    //             }
+    //         }
+    //         _ => {}
+    //     }
+    // }
     fn apparent_did(&self) -> Option<DomainId> {
         match self {
             RuleAtom::Construct { did, .. } => Some(did.clone()),
-            RuleAtom::Constant { c } => Some(c.did()),
+            RuleAtom::Constant { c } => Some(c.domain_id()),
             RuleAtom::Variable { .. } => None,
         }
     }
-    fn typing(&self, pm: &ParamsMap, v2d: &mut VidToDid) -> Result<(), StmtCheckErr> {
+    fn typing(&self, dd: &DomainDefinitions, vt: &mut VariableTypes) -> Result<(), StmtCheckErr> {
         match self {
             RuleAtom::Construct { did, args } => {
                 let (_defn_sidx, param_dids) =
-                    pm.get(did).ok_or(StmtCheckErr::UndefinedConstructor { did: did.clone() })?;
+                    dd.get(did).ok_or(StmtCheckErr::UndefinedConstructor { did: did.clone() })?;
                 if param_dids.len() != args.len() {
                     return Err(StmtCheckErr::WrongArity {
                         did: did.clone(),
@@ -248,7 +280,7 @@ impl RuleAtom {
                 }
                 for (arg, param_did) in args.iter().zip(param_dids.iter()) {
                     if let RuleAtom::Variable { vid } = arg {
-                        match v2d.insert(vid.clone(), param_did.clone()) {
+                        match vt.insert(vid.clone(), param_did.clone()) {
                             Some(param_did2) if param_did != &param_did2 => {
                                 return Err(StmtCheckErr::OneVariableTwoTypes {
                                     vid: vid.clone(),
@@ -268,7 +300,7 @@ impl RuleAtom {
                     }
                 }
                 for arg in args {
-                    arg.typing(pm, v2d)?
+                    arg.typing(dd, vt)?
                 }
             }
             _ => {}
@@ -286,22 +318,11 @@ impl RuleAtom {
             }
         }
     }
-    fn undeclared_domain_id(&self, declarations: &HashSet<DomainId>) -> Option<DomainId> {
-        match self {
-            RuleAtom::Construct { did, args } => {
-                if !declarations.contains(did) {
-                    return Some(did.clone());
-                }
-                args.iter().map(|ra| ra.undeclared_domain_id(declarations)).next().flatten()
-            }
-            _ => None,
-        }
-    }
-    // NOTE: assumes `v2d` covers all occurring variables
-    pub fn domain_id<'a: 'c, 'b: 'c, 'c>(&'a self, v2d: &'b VidToDid) -> Option<&'c DomainId> {
+    // NOTE: assumes `vt` covers all occurring variables
+    pub fn domain_id<'a: 'c, 'b: 'c, 'c>(&'a self, vt: &'b VariableTypes) -> Option<&'c DomainId> {
         match self {
             RuleAtom::Construct { did, .. } => Some(did),
-            RuleAtom::Variable { vid } => v2d.get(vid),
+            RuleAtom::Variable { vid } => vt.get(vid),
             _ => None,
         }
     }
@@ -310,12 +331,12 @@ impl RuleAtom {
 impl RuleLiteral {
     pub fn is_enumerable_in<'a: 'c, 'b: 'c, 'c>(
         &'a self,
-        v2d: &'b VidToDid,
+        vt: &'b VariableTypes,
     ) -> Option<&'c DomainId> {
         if self.sign == Sign::Pos {
             let did = match &self.ra {
                 RuleAtom::Construct { did, .. } => did,
-                RuleAtom::Variable { vid } => v2d.get(vid).expect("Checked before, I think"),
+                RuleAtom::Variable { vid } => vt.get(vid).expect("Checked before, I think"),
                 _ => return None,
             };
             if !did.is_primitive() {
@@ -324,8 +345,8 @@ impl RuleLiteral {
         };
         None
     }
-    // NOTE: assumes `v2d` covers all occurring variables
-    fn variables_if_enumerable(&self, v2d: &VidToDid, variables: &mut HashSet<VariableId>) {
+    // NOTE: assumes `vt` covers all occurring variables
+    fn variables_if_enumerable(&self, vt: &VariableTypes, variables: &mut HashSet<VariableId>) {
         if self.sign == Sign::Pos {
             match &self.ra {
                 RuleAtom::Construct { did, args } if !did.is_primitive() => {
@@ -334,7 +355,7 @@ impl RuleLiteral {
                     }
                 }
                 RuleAtom::Variable { vid } => {
-                    let did = v2d.get(vid).expect("Checked before, I think");
+                    let did = vt.get(vid).expect("Checked before, I think");
                     if !did.is_primitive() {
                         self.ra.variables(variables)
                     }

@@ -35,6 +35,7 @@ fn main() -> Result<(), ()> {
             );
         }
         println!("seal broken: {:?}", program.seal_break());
+        println!("undeclared domains: {:?}", program.undeclared_domains());
         println!("check result {:#?}", check_result.as_ref().map(drop));
     }
     println!("parse result {:?}", parse_result.as_ref().map(drop));

@@ -1,6 +1,6 @@
 use crate::{
     ast::*,
-    statics::{RuleToVidToDid, VidToDid},
+    statics::{RuleVariableTypes, VariableTypes},
 };
 use std::collections::{HashMap, HashSet};
 
@@ -113,7 +113,7 @@ impl VariableAssignments {
 impl Program {
     fn big_step_inference(
         &self,
-        r2v2d: &RuleToVidToDid,
+        rvt: &RuleVariableTypes,
         neg: ComplementKnowledge,
         pos_w: &mut Knowledge,
         va: &mut VariableAssignments,
@@ -124,7 +124,7 @@ impl Program {
             for (sidx, statement) in self.statements.iter().enumerate() {
                 if let Statement::Rule(rule) = statement {
                     // println!("rule at index {} ...", sidx);
-                    let v2d = r2v2d.get(&sidx).expect("wah");
+                    let v2d = rvt.get(&sidx).expect("wah");
                     rule.inference_stage(v2d, neg, &pos_r, pos_w, va);
                 }
             }
@@ -137,11 +137,11 @@ impl Program {
         }
     }
 
-    pub fn denotation(&self, r2v2d: &RuleToVidToDid) -> Denotation {
+    pub fn denotation(&self, rvt: &RuleVariableTypes) -> Denotation {
         let mut pos_w = Knowledge::default();
         let mut va = VariableAssignments::default();
         let mut interpretations =
-            vec![self.big_step_inference(r2v2d, ComplementKnowledge::Empty, &mut pos_w, &mut va)];
+            vec![self.big_step_inference(rvt, ComplementKnowledge::Empty, &mut pos_w, &mut va)];
         loop {
             // println!("\n>>>>>> INTERPRTATIONS: {:?}", &interpretations);
             if interpretations.len() % 2 == 1 {
@@ -172,7 +172,7 @@ impl Program {
                 }
             }
             let neg = ComplementKnowledge::ComplementOf(interpretations.iter().last().unwrap());
-            let pos = self.big_step_inference(r2v2d, neg, &mut pos_w, &mut va);
+            let pos = self.big_step_inference(rvt, neg, &mut pos_w, &mut va);
             interpretations.push(pos);
         }
     }
@@ -248,7 +248,7 @@ impl RuleAtom {
 impl Rule {
     fn inference_stage(
         &self,
-        v2d: &VidToDid,
+        v2d: &VariableTypes,
         neg: ComplementKnowledge,
         pos_r: &Knowledge,
         pos_w: &mut Knowledge,
@@ -262,7 +262,7 @@ impl Rule {
 
     fn inference_stage_rec(
         &self,
-        v2d: &VidToDid,
+        v2d: &VariableTypes,
         neg: ComplementKnowledge,
         pos_r: &Knowledge,
         pos_w: &mut Knowledge,
