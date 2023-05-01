@@ -31,22 +31,27 @@ struct StateToken {
     assignments_count: usize,
 }
 
+#[derive(Copy, Clone)]
+enum NegativeKnowledge<'a> {
+    Empty,
+    ComplementOf(&'a Knowledge),
+}
+
+impl NegativeKnowledge<'_> {
+    fn contains(self, did: &DomainId, atom: &Atom) -> bool {
+        match self {
+            Self::Empty => false,
+            Self::ComplementOf(k) => !k.contains(did, atom),
+        }
+    }
+}
+
 impl std::fmt::Debug for Atom {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Constant { c } => match c {
-                Constant::Int(c) => {
-                    c.fmt(f)
-                    // let mut f = f.debug_tuple("int");
-                    // f.field(c);
-                    // f
-                }
-                Constant::Str(c) => {
-                    // let mut f = f.debug_tuple("str");
-                    // f.field(c);
-                    // f
-                    c.fmt(f)
-                }
+                Constant::Int(c) => c.fmt(f),
+                Constant::Str(c) => c.fmt(f),
             },
             Self::Construct { did, args } => {
                 let mut f = f.debug_tuple(&did.0);
@@ -56,7 +61,6 @@ impl std::fmt::Debug for Atom {
                 f.finish()
             }
         }
-        // .finish()
     }
 }
 
@@ -109,7 +113,7 @@ impl Program {
     fn big_step_inference(
         &self,
         r2v2d: &RuleToVidToDid,
-        not_neg: &Knowledge,
+        neg: NegativeKnowledge,
         pos_w: &mut Knowledge,
     ) -> Knowledge {
         assert!(pos_w.map.is_empty());
@@ -118,7 +122,7 @@ impl Program {
             for (sidx, statement) in self.statements.iter().enumerate() {
                 if let Statement::Rule(rule) = statement {
                     let v2d = r2v2d.get(&sidx).expect("wah");
-                    rule.inference_stage(v2d, not_neg, &pos_r, pos_w);
+                    rule.inference_stage(v2d, neg, &pos_r, pos_w);
                 }
             }
             let changed = pos_r.absorb_all(pos_w);
@@ -132,18 +136,24 @@ impl Program {
 
     pub fn denotation(&self, r2v2d: &RuleToVidToDid) -> Denotation {
         let mut pos_w = Knowledge::default();
-        let mut interpretations = vec![Knowledge::default()];
+        let mut interpretations =
+            vec![self.big_step_inference(r2v2d, NegativeKnowledge::Empty, &mut pos_w)];
         loop {
             if interpretations.len() % 2 == 0 {
                 if let [.., a, b, c, d] = interpretations.as_mut_slice() {
                     if a == c && b == d {
                         use std::mem::take;
-                        return Denotation { pos: take(d), unk: take(c) };
+                        let pos = take(d);
+                        let mut unk = take(c);
+                        for (did, set) in unk.map.iter_mut() {
+                            set.retain(|atom| !pos.contains(did, atom))
+                        }
+                        return Denotation { pos, unk };
                     }
                 }
             }
-            let not_neg = interpretations.iter().last().unwrap();
-            let pos = self.big_step_inference(r2v2d, not_neg, &mut pos_w);
+            let neg = NegativeKnowledge::ComplementOf(interpretations.iter().last().unwrap());
+            let pos = self.big_step_inference(r2v2d, neg, &mut pos_w);
             interpretations.push(pos);
         }
     }
@@ -213,7 +223,7 @@ impl Rule {
     fn inference_stage_rec(
         &self,
         v2d: &VidToDid,
-        not_neg: &Knowledge,
+        neg: NegativeKnowledge,
         pos_r: &Knowledge,
         pos_w: &mut Knowledge,
         va: &mut VariableAssignments,
@@ -229,7 +239,7 @@ impl Rule {
                         match antecedent.sign {
                             Sign::Pos => todo!(),
                             Sign::Neg => {
-                                if not_neg.contains(did, &atom) {
+                                if !neg.contains(did, &atom) {
                                     break;
                                 }
                             }
@@ -254,23 +264,23 @@ impl Rule {
                             break;
                         }
                         // println!("AFTER {:?}", va);
-                        self.inference_stage_rec(v2d, not_neg, pos_r, pos_w, va, new_tail);
+                        self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail);
                         va.restore_state(state_token).expect("oh no");
                     }
                 }
-                None => self.inference_stage_rec(v2d, not_neg, pos_r, pos_w, va, new_tail),
+                None => self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail),
             },
         }
     }
     fn inference_stage(
         &self,
         v2d: &VidToDid,
-        not_neg: &Knowledge,
+        neg: NegativeKnowledge,
         pos_r: &Knowledge,
         pos_w: &mut Knowledge,
     ) {
         let mut va = VariableAssignments::default();
         // dbg!(self);
-        self.inference_stage_rec(v2d, not_neg, pos_r, pos_w, &mut va, &self.antecedents)
+        self.inference_stage_rec(v2d, neg, pos_r, pos_w, &mut va, &self.antecedents)
     }
 }
