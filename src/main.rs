@@ -1,18 +1,18 @@
-use std::io::Read;
-use std::time::Instant;
+mod arena;
 mod ast;
 mod dynamics;
 mod parse;
 mod statics;
 
 fn stdin_to_string() -> Result<String, std::io::Error> {
+    use std::io::Read as _;
     let mut buffer = String::new();
-    let stdin = std::io::stdin();
-    stdin.lock().read_to_string(&mut buffer)?;
+    std::io::stdin().lock().read_to_string(&mut buffer)?;
     Ok(buffer)
 }
 
 fn main() -> Result<(), ()> {
+    use std::time::Instant;
     let source = stdin_to_string().expect("bad stdin");
     let start_i0 = Instant::now();
     let parse_result = parse::program(&source);

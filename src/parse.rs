@@ -13,38 +13,36 @@ use nom::{
 
 ////////// PARSER COMBINATORS //////////
 
-fn wsl<'a, F: 'a, O, E: ParseError<&'a str>>(
-    inner: F,
-) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
+fn wsl<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
-    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
+    E: ParseError<&'a str>,
+    F: FnMut(&'a str) -> IResult<&'a str, O, E> + 'a,
 {
     preceded(multispace0, inner)
 }
 
-fn wsr<'a, F: 'a, O, E: ParseError<&'a str>>(
-    inner: F,
-) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
+fn wsr<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
-    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
+    E: ParseError<&'a str>,
+    F: FnMut(&'a str) -> IResult<&'a str, O, E> + 'a,
 {
     terminated(inner, multispace0)
 }
 
-fn ws<'a, F: 'a, O: 'a, E: ParseError<&'a str> + 'a>(
-    inner: F,
-) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
+fn ws<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
-    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
+    E: ParseError<&'a str> + 'a,
+    F: FnMut(&'a str) -> IResult<&'a str, O, E> + 'a,
+    O: 'a,
 {
     wsl(wsr(inner))
 }
 
-fn commasep<'a, F: 'a, O: 'a, E: ParseError<&'a str> + 'a>(
-    inner: F,
-) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<O>, E>
+fn commasep<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<O>, E>
 where
-    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
+    E: ParseError<&'a str> + 'a,
+    F: FnMut(&'a str) -> IResult<&'a str, O, E> + 'a,
+    O: 'a,
 {
     separated_list0(ws(tag(",")), inner)
 }
@@ -53,7 +51,8 @@ fn list<'a, F: 'a, O: 'a, E: ParseError<&'a str> + 'a>(
     inner: F,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<O>, E>
 where
-    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
+    E: ParseError<&'a str>,
+    F: FnMut(&'a str) -> IResult<&'a str, O, E> + 'a,
 {
     delimited(ws(tag("(")), commasep(inner), ws(tag(")")))
 }
