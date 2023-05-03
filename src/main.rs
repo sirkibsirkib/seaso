@@ -1,20 +1,10 @@
-use crate::ast::StatementIdx;
-use crate::statics::StatementCheckErr;
-
 mod ast;
 mod dynamics;
 mod parse;
 mod preprocessing;
-mod print;
 mod statics;
 
-#[allow(dead_code)]
-#[derive(Debug)]
-struct PrettyCheckError {
-    statement_index: StatementIdx,
-    statement: String,
-    error_kind: StatementCheckErr,
-}
+use std::time::{Duration, Instant};
 
 fn stdin_to_string() -> Result<String, std::io::Error> {
     use std::io::Read as _;
@@ -23,8 +13,15 @@ fn stdin_to_string() -> Result<String, std::io::Error> {
     Ok(buffer)
 }
 
+#[allow(dead_code)]
+#[derive(Debug)]
+struct TimesTaken {
+    parse: Duration,
+    check: Duration,
+    denote: Duration,
+}
+
 fn main() -> Result<(), ()> {
-    use std::time::Instant;
     let source = preprocessing::line_comments_removed(stdin_to_string().expect("bad stdin"));
     let start_i0 = Instant::now();
     let parse_result = parse::program(&source)
@@ -34,33 +31,22 @@ fn main() -> Result<(), ()> {
         let check_result = program.check();
         let start_i2 = Instant::now();
         if let Ok(r2v2d) = &check_result {
-            let den = program.denotation(&r2v2d);
+            let denotation = program.denotation(&r2v2d);
             let start_i3 = Instant::now();
             println!(
-                "times taken:\n- parse {:?}\n- check {:?}\n- denote {:?}",
-                start_i1 - start_i0,
-                start_i2 - start_i1,
-                start_i3 - start_i2
-            );
-            println!(
-                "Denotation:\n- trues: {:?}\n- unknowns: {:?}\n- emissions: {:?}",
-                &den.trues, &den.unknowns, &den.emissions,
-            );
-        }
-        println!("seal broken: {:?}", program.seal_break());
-        println!("undeclared domains: {:?}", program.undeclared_domains());
-        use crate::statics::CheckErr;
-        println!(
-            "check result {:#?}",
-            check_result.map(drop).map_err(|CheckErr { sidx, statement, err }| {
-                PrettyCheckError {
-                    statement_index: sidx,
-                    statement: statement.printed(),
-                    error_kind: err,
+                "{:#?}",
+                TimesTaken {
+                    parse: start_i1 - start_i0,
+                    check: start_i2 - start_i1,
+                    denote: start_i3 - start_i2
                 }
-            })
-        );
+            );
+            println!("{:#?}", &denotation);
+        }
+        println!("undeclared domains: {:?}", program.undeclared_domains());
+        println!("seal broken: {:?}", program.seal_break());
+        println!("check error {:#?}", check_result.err());
     }
-    println!("parse result {:?}", parse_result.as_ref().map(drop));
+    println!("parse error {:?}", parse_result.err());
     Ok(())
 }

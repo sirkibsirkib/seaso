@@ -12,9 +12,9 @@ pub type VariableTypes = HashMap<VariableId, DomainId>;
 
 #[derive(Debug)]
 pub struct CheckErr<'a> {
-    pub sidx: StatementIdx,
+    pub statement_index: StatementIdx,
     pub statement: &'a Statement,
-    pub err: StatementCheckErr,
+    pub error: StatementCheckErr,
 }
 
 #[derive(Debug)]
@@ -65,10 +65,10 @@ impl Program {
             .enumerate()
             .flat_map(|(sidx, statement)| {
                 statement.rule_type_variables(&dd).map(|x| {
-                    x.map(|x| (sidx, x)).map_err(|err| CheckErr {
-                        sidx,
+                    x.map(|x| (sidx, x)).map_err(|error| CheckErr {
+                        statement_index: sidx,
                         statement: &self.statements[sidx],
-                        err,
+                        error,
                     })
                 })
             })
@@ -147,10 +147,10 @@ impl Program {
             Ok(())
         };
         for (sidx, statement) in self.statements.iter().enumerate() {
-            f(sidx, statement).map_err(|err| CheckErr {
-                sidx,
+            f(sidx, statement).map_err(|error| CheckErr {
+                statement_index: sidx,
                 statement: &self.statements[sidx],
-                err,
+                error,
             })?
         }
         Ok(dd)

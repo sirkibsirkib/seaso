@@ -66,9 +66,25 @@ impl std::fmt::Debug for Atom {
 
 impl std::fmt::Debug for Knowledge {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut list: Vec<_> = self.map.values().flat_map(HashSet::iter).collect();
-        list.sort();
-        f.debug_set().entries(list).finish()
+        // let mut list: Vec<_> = self.map.values().flat_map(HashSet::iter).collect();
+        let vec_map: HashMap<&DomainId, Vec<_>> = self
+            .map
+            .iter()
+            .filter_map(|(did, set)| {
+                if set.is_empty() {
+                    None
+                } else {
+                    Some({
+                        let mut vec = set.iter().collect::<Vec<_>>();
+                        vec.sort();
+                        (did, vec)
+                    })
+                }
+            })
+            .collect();
+        let commasep_map =
+            vec_map.iter().map(|(did, vec)| (did, CommaSep { iter: vec, spaced: true }));
+        f.debug_map().entries(commasep_map).finish()
     }
 }
 

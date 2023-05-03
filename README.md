@@ -12,28 +12,38 @@ To acquire and compile from source:
 The compiled binary ('the Seaso executor') will be found at `./target/release/seaso` (or `.\target\release\seaso.exe` on Windows).
 
 ## Usage
-Run the Seaso executor, feeding in your source code as standard input. For example, run `./target/release/seaso_executor.exe < ./program_examples/toy1.seaso`.
+Run the Seaso executor, feeding in your source code as standard input. For example, run `./target/release/seaso.exe < ./program_examples/toy1.seaso`.
 
 ## Output
 
 Once the Seaso executor has consumed all standard input, it will parse and check if your Seaso program is well-formed, and if, so, will compute and output its denotation.
 The denotation consists of three sets of atoms: _truths_, _unknowns_, and _emissions_.
-Always, truths 
+Always, truths and unknowns are disjoint, and truths are a superset of emissions.
+Here is an example output resulting from `./target/release/seaso.exe < ./program_examples/trust.seaso`
 
 ```
-times taken:
-- parse 53.5µs
-- check 834µs
-- denote 216.8µs
-Denotation:
-- trues: {x(8), x(9), y(8, 8), y(9, 8), y(9, 9), z(8, 9)}
-- unknown: {}
-- emissions: {}
-seal broken: None
+TimesTaken {
+    parse: 40.4µs,
+    check: 378.5µs,
+    denote: 613.7µs,
+}
+Denotation {
+    trues: {
+        eq: eq(party("Amy"), party("Amy"))eq(party("Bob"), party("Bob")), eq(party("Dan"), party("Dan")), ,
+        party: party("Amy")party("Bob"), party("Dan"), ,
+        trust: trust(party("Amy"), party("Bob"))trust(party("Amy"), party("Dan")), trust(party("Dan"), party("Bob")), ,
+        trusted: trusted(party("Bob"))trusted(party("Dan")), ,
+        very_trusted: very_trusted(party("Bob")),
+        untrusted: untrusted(party("Amy")),
+    },
+    unknowns: {},
+    emissions: {
+        untrusted: untrusted(party("Amy")),
+    },
+}
 undeclared domains: {}
-check result Ok(
-    (),
-)
-parse result Ok(())
+seal broken: None
+check error None
+parse error None
 ```
 
