@@ -1,9 +1,20 @@
+use crate::ast::StatementIdx;
+use crate::statics::StatementCheckErr;
+
 mod ast;
 mod dynamics;
 mod parse;
 mod preprocessing;
-// mod print;
+mod print;
 mod statics;
+
+#[allow(dead_code)]
+#[derive(Debug)]
+struct PrettyCheckError {
+    statement_index: StatementIdx,
+    statement: String,
+    error_kind: StatementCheckErr,
+}
 
 fn stdin_to_string() -> Result<String, std::io::Error> {
     use std::io::Read as _;
@@ -36,10 +47,19 @@ fn main() -> Result<(), ()> {
                 &den.trues, &den.unknowns, &den.emissions,
             );
         }
-        // println!("program {}", program.printed(true));
         println!("seal broken: {:?}", program.seal_break());
         println!("undeclared domains: {:?}", program.undeclared_domains());
-        println!("check result {:#?}", check_result.as_ref().map(drop));
+        use crate::statics::CheckErr;
+        println!(
+            "check result {:#?}",
+            check_result.map(drop).map_err(|CheckErr { sidx, statement, err }| {
+                PrettyCheckError {
+                    statement_index: sidx,
+                    statement: statement.printed(),
+                    error_kind: err,
+                }
+            })
+        );
     }
     println!("parse result {:?}", parse_result.as_ref().map(drop));
     Ok(())

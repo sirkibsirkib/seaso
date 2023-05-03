@@ -11,21 +11,22 @@ pub type RuleVariableTypes = HashMap<StatementIdx, VariableTypes>;
 pub type VariableTypes = HashMap<VariableId, DomainId>;
 
 #[derive(Debug)]
-pub struct CheckErr {
+pub struct CheckErr<'a> {
     pub sidx: StatementIdx,
-    pub err: StmtCheckErr,
+    pub statement: &'a Statement,
+    pub err: StatementCheckErr,
 }
 
 #[derive(Debug)]
-pub enum StmtCheckErr {
-    UndefinedConstructor { did: DomainId },
+pub enum StatementCheckErr {
+    UndefinedConstructor(DomainId),
     OneVariableTwoTypes { vid: VariableId, domains: [DomainId; 2] },
-    NoTypes { vid: VariableId },
+    NoTypes(VariableId),
     WrongArity { did: DomainId, param_count: usize, arg_count: usize },
-    VariableNotEnumerable { vid: VariableId },
+    VariableNotEnumerable(VariableId),
     ConflictingDefinition { did: DomainId, previous_sidx: StatementIdx },
     MistypedArgument { constructor: DomainId, expected: DomainId, got: DomainId },
-    DefiningPrimitive { did: DomainId },
+    DefiningPrimitive(DomainId),
 }
 
 #[derive(Debug)]
@@ -57,18 +58,19 @@ impl Program {
     /// understood as the internal representation.
     /// Note, the other well-formedness criteria can be checked separately,
     /// e.g., using `undeclared_domains`.
-    pub fn check(&self) -> Result<RuleVariableTypes, (&Statement, CheckErr)> {
-        self.check_inner().map_err(|e| (&self.statements[e.sidx], e))
-    }
-    fn check_inner(&self) -> Result<RuleVariableTypes, CheckErr> {
+    pub fn check(&self) -> Result<RuleVariableTypes, CheckErr> {
         let dd = self.domain_definitions()?;
         self.statements
             .iter()
             .enumerate()
             .flat_map(|(sidx, statement)| {
-                statement
-                    .rule_type_variables(&dd)
-                    .map(|x| x.map(|x| (sidx, x)).map_err(|err| CheckErr { sidx, err }))
+                statement.rule_type_variables(&dd).map(|x| {
+                    x.map(|x| (sidx, x)).map_err(|err| CheckErr {
+                        sidx,
+                        statement: &self.statements[sidx],
+                        err,
+                    })
+                })
             })
             .collect()
     }
@@ -129,13 +131,13 @@ impl Program {
         let mut f = |sidx, statement: &Statement| {
             if let Statement::Defn { did, params } = statement {
                 if did.is_primitive() {
-                    return Err(StmtCheckErr::DefiningPrimitive { did: did.clone() });
+                    return Err(StatementCheckErr::DefiningPrimitive(did.clone()));
                 }
                 let value = (sidx, params.clone());
                 let prev = dd.insert(did.clone(), value.clone());
                 if let Some((previous_sidx, previous_params)) = prev {
                     if &previous_params != params {
-                        return Err(StmtCheckErr::ConflictingDefinition {
+                        return Err(StatementCheckErr::ConflictingDefinition {
                             previous_sidx,
                             did: did.clone(),
                         });
@@ -145,7 +147,11 @@ impl Program {
             Ok(())
         };
         for (sidx, statement) in self.statements.iter().enumerate() {
-            f(sidx, statement).map_err(|err| CheckErr { sidx, err })?
+            f(sidx, statement).map_err(|err| CheckErr {
+                sidx,
+                statement: &self.statements[sidx],
+                err,
+            })?
         }
         Ok(dd)
     }
@@ -190,7 +196,7 @@ impl Statement {
     fn rule_type_variables(
         &self,
         dd: &DomainDefinitions,
-    ) -> Option<Result<VariableTypes, StmtCheckErr>> {
+    ) -> Option<Result<VariableTypes, StatementCheckErr>> {
         if let Statement::Rule(Rule { consequents, antecedents }) = self {
             let mut vt = VariableTypes::default();
             let mut vids = HashSet::<VariableId>::default();
@@ -201,7 +207,7 @@ impl Statement {
                 }
             }
             Some(if let Some(vid) = vids.iter().find(|&vid| !vt.contains_key(vid)) {
-                Err(StmtCheckErr::NoTypes { vid: vid.clone() })
+                Err(StatementCheckErr::NoTypes(vid.clone()))
             } else {
                 // enumerability check
                 let mut enumerable = HashSet::default();
@@ -211,7 +217,7 @@ impl Statement {
                     }
                 }
                 if let Some(vid) = vids.difference(&enumerable).next() {
-                    Err(StmtCheckErr::VariableNotEnumerable { vid: vid.clone() })
+                    Err(StatementCheckErr::VariableNotEnumerable(vid.clone()))
                 } else {
                     Ok(vt)
                 }
@@ -246,12 +252,12 @@ impl RuleAtom {
         &self,
         dd: &DomainDefinitions,
         vt: &mut VariableTypes,
-    ) -> Result<(), StmtCheckErr> {
+    ) -> Result<(), StatementCheckErr> {
         if let RuleAtom::Construct { did, args } = self {
             let (_defn_sidx, param_dids) =
-                dd.get(did).ok_or(StmtCheckErr::UndefinedConstructor { did: did.clone() })?;
+                dd.get(did).ok_or(StatementCheckErr::UndefinedConstructor(did.clone()))?;
             if param_dids.len() != args.len() {
-                return Err(StmtCheckErr::WrongArity {
+                return Err(StatementCheckErr::WrongArity {
                     did: did.clone(),
                     param_count: param_dids.len(),
                     arg_count: args.len(),
@@ -261,7 +267,7 @@ impl RuleAtom {
                 if let RuleAtom::Variable(vid) = arg {
                     match vt.insert(vid.clone(), param_did.clone()) {
                         Some(param_did2) if param_did != &param_did2 => {
-                            return Err(StmtCheckErr::OneVariableTwoTypes {
+                            return Err(StatementCheckErr::OneVariableTwoTypes {
                                 vid: vid.clone(),
                                 domains: [param_did.clone(), param_did2.clone()],
                             });
@@ -270,7 +276,7 @@ impl RuleAtom {
                     }
                 } else if let Some(arg_did) = arg.apparent_did() {
                     if &arg_did != param_did {
-                        return Err(StmtCheckErr::MistypedArgument {
+                        return Err(StatementCheckErr::MistypedArgument {
                             constructor: did.clone(),
                             expected: param_did.clone(),
                             got: arg_did,
