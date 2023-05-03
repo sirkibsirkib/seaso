@@ -2,6 +2,7 @@ use crate::{
     ast::*,
     statics::{RuleVariableTypes, VariableTypes},
 };
+use core::fmt::Debug;
 use std::collections::{HashMap, HashSet};
 
 /// Concrete counterpart to `RuleAtom` with no domain info
@@ -31,11 +32,20 @@ struct StateToken {
     assignments_count: usize,
 }
 
+pub struct NoPretty<T: Debug>(pub T);
+impl<T: Debug> Debug for NoPretty<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}", &self.0)
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 enum ComplementKnowledge<'a> {
     Empty,
     ComplementOf(&'a Knowledge),
 }
+
+//////////////////////////////////////////////////////
 
 impl ComplementKnowledge<'_> {
     fn contains(self, did: &DomainId, atom: &Atom) -> bool {
@@ -66,7 +76,6 @@ impl std::fmt::Debug for Atom {
 
 impl std::fmt::Debug for Knowledge {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // let mut list: Vec<_> = self.map.values().flat_map(HashSet::iter).collect();
         let vec_map: HashMap<&DomainId, Vec<_>> = self
             .map
             .iter()
@@ -75,16 +84,14 @@ impl std::fmt::Debug for Knowledge {
                     None
                 } else {
                     Some({
-                        let mut vec = set.iter().collect::<Vec<_>>();
-                        vec.sort();
+                        let mut vec = set.iter().map(NoPretty).collect::<Vec<_>>();
+                        vec.sort_by_key(|t| t.0);
                         (did, vec)
                     })
                 }
             })
             .collect();
-        let commasep_map =
-            vec_map.iter().map(|(did, vec)| (did, CommaSep { iter: vec, spaced: true }));
-        f.debug_map().entries(commasep_map).finish()
+        f.debug_map().entries(vec_map).finish()
     }
 }
 

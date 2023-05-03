@@ -61,6 +61,7 @@ pub struct RuleLiteral {
 }
 
 /////////////
+
 pub struct CommaSep<'a, T: Debug + 'a, I: IntoIterator<Item = &'a T> + Clone> {
     pub iter: I,
     pub spaced: bool,
@@ -69,10 +70,10 @@ pub struct CommaSep<'a, T: Debug + 'a, I: IntoIterator<Item = &'a T> + Clone> {
 impl<'a, T: Debug + 'a, I: IntoIterator<Item = &'a T> + Clone> Debug for CommaSep<'a, T, I> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         for (i, x) in self.iter.clone().into_iter().enumerate() {
-            write!(f, "{:?}", x)?;
             if i > 0 {
                 write!(f, "{}", if self.spaced { ", " } else { "," })?;
             }
+            write!(f, "{:?}", x)?;
         }
         Ok(())
     }

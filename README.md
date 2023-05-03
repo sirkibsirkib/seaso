@@ -23,22 +23,43 @@ Here is an example output resulting from `./target/release/seaso.exe < ./program
 
 ```
 TimesTaken {
-    parse: 40.4µs,
-    check: 378.5µs,
-    denote: 613.7µs,
+    parse: 59.3µs,
+    check: 494.1µs,
+    denote: 796.8µs,
 }
 Denotation {
     trues: {
-        eq: eq(party("Amy"), party("Amy"))eq(party("Bob"), party("Bob")), eq(party("Dan"), party("Dan")), ,
-        party: party("Amy")party("Bob"), party("Dan"), ,
-        trust: trust(party("Amy"), party("Bob"))trust(party("Amy"), party("Dan")), trust(party("Dan"), party("Bob")), ,
-        trusted: trusted(party("Bob"))trusted(party("Dan")), ,
-        very_trusted: very_trusted(party("Bob")),
-        untrusted: untrusted(party("Amy")),
+        eq: [
+            eq(party("Amy"), party("Amy")),
+            eq(party("Bob"), party("Bob")),
+            eq(party("Dan"), party("Dan")),
+        ],
+        untrusted: [
+            untrusted(party("Amy")),
+        ],
+        party: [
+            party("Amy"),
+            party("Bob"),
+            party("Dan"),
+        ],
+        very_trusted: [
+            very_trusted(party("Bob")),
+        ],
+        trusted: [
+            trusted(party("Bob")),
+            trusted(party("Dan")),
+        ],
+        trust: [
+            trust(party("Amy"), party("Bob")),
+            trust(party("Amy"), party("Dan")),
+            trust(party("Dan"), party("Bob")),
+        ],
     },
     unknowns: {},
     emissions: {
-        untrusted: untrusted(party("Amy")),
+        untrusted: [
+            untrusted(party("Amy")),
+        ],
     },
 }
 undeclared domains: {}
