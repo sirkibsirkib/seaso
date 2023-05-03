@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "seal_dsl_rs"
+name = "seaso"
 version = "0.1.0"
 dependencies = [
  "nom",

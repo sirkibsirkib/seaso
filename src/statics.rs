@@ -47,7 +47,7 @@ impl Program {
         self.statements
             .iter()
             .filter_map(|statement| match statement {
-                Statement::Emit { did } => Some(did),
+                Statement::Emit(did) => Some(did),
                 _ => None,
             })
             .collect()
@@ -94,7 +94,7 @@ impl Program {
         let mut lsa = LastSealedAt::default();
         for (sidx, statement) in self.statements.iter().enumerate() {
             match statement {
-                Statement::Seal { did } => {
+                Statement::Seal(did) => {
                     lsa.insert(did.clone(), sidx);
                 }
                 Statement::Rule(Rule { consequents, .. }) => {
@@ -110,7 +110,7 @@ impl Program {
                         }
                     }
                 }
-                Statement::Emit { did } => {
+                Statement::Emit(did) => {
                     if let Some(&s_sidx) = lsa.get(did) {
                         return Some(SealBreak {
                             sealed: s_sidx,
@@ -159,7 +159,7 @@ impl Program {
         self.statements
             .iter()
             .filter_map(|statement| match statement {
-                Statement::Decl { did } | Statement::Defn { did, .. } => Some(did.clone()),
+                Statement::Decl(did) | Statement::Defn { did, .. } => Some(did.clone()),
                 _ => None,
             })
             .chain(DomainId::PRIMITIVE_STRS.map(String::from).map(DomainId))
@@ -182,7 +182,7 @@ impl Statement {
                     x.insert(param);
                 }
             }
-            Statement::Decl { did } | Statement::Emit { did } | Statement::Seal { did } => {
+            Statement::Decl(did) | Statement::Emit(did) | Statement::Seal(did) => {
                 x.insert(did);
             }
             Statement::Rule(..) => {}
@@ -262,7 +262,7 @@ impl RuleAtom {
     fn apparent_did(&self) -> Option<DomainId> {
         match self {
             RuleAtom::Construct { did, .. } => Some(did.clone()),
-            RuleAtom::Constant { c } => Some(c.domain_id()),
+            RuleAtom::Constant(c) => Some(c.domain_id()),
             RuleAtom::Variable { .. } => None,
         }
     }
@@ -279,7 +279,7 @@ impl RuleAtom {
                     });
                 }
                 for (arg, param_did) in args.iter().zip(param_dids.iter()) {
-                    if let RuleAtom::Variable { vid } = arg {
+                    if let RuleAtom::Variable(vid) = arg {
                         match vt.insert(vid.clone(), param_did.clone()) {
                             Some(param_did2) if param_did != &param_did2 => {
                                 return Err(StmtCheckErr::OneVariableTwoTypes {
@@ -310,7 +310,7 @@ impl RuleAtom {
     fn variables(&self, vids: &mut HashSet<VariableId>) {
         match self {
             RuleAtom::Constant { .. } => {}
-            RuleAtom::Variable { vid } => drop(vids.insert(vid.clone())),
+            RuleAtom::Variable(vid) => drop(vids.insert(vid.clone())),
             RuleAtom::Construct { args, .. } => {
                 for arg in args {
                     arg.variables(vids)
@@ -322,7 +322,7 @@ impl RuleAtom {
     pub fn domain_id<'a: 'c, 'b: 'c, 'c>(&'a self, vt: &'b VariableTypes) -> Option<&'c DomainId> {
         match self {
             RuleAtom::Construct { did, .. } => Some(did),
-            RuleAtom::Variable { vid } => vt.get(vid),
+            RuleAtom::Variable(vid) => vt.get(vid),
             _ => None,
         }
     }
@@ -336,7 +336,7 @@ impl RuleLiteral {
         if self.sign == Sign::Pos {
             let did = match &self.ra {
                 RuleAtom::Construct { did, .. } => did,
-                RuleAtom::Variable { vid } => vt.get(vid).expect("Checked before, I think"),
+                RuleAtom::Variable(vid) => vt.get(vid).expect("Checked before, I think"),
                 _ => return None,
             };
             if !did.is_primitive() {
@@ -354,7 +354,7 @@ impl RuleLiteral {
                         arg.variables(variables)
                     }
                 }
-                RuleAtom::Variable { vid } => {
+                RuleAtom::Variable(vid) => {
                     let did = vt.get(vid).expect("Checked before, I think");
                     if !did.is_primitive() {
                         self.ra.variables(variables)

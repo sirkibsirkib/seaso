@@ -23,8 +23,8 @@ pub enum Constant {
 /// See `Atom` (defined in `dynamics.rs`) for the concretized version.
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum RuleAtom {
-    Variable { vid: VariableId },
-    Constant { c: Constant },
+    Variable(VariableId),
+    Constant(Constant),
     Construct { did: DomainId, args: Vec<RuleAtom> },
 }
 
@@ -35,11 +35,11 @@ pub struct Program {
 
 #[derive(Debug)]
 pub enum Statement {
-    Decl { did: DomainId },
+    Decl(DomainId),
     Defn { did: DomainId, params: Vec<DomainId> },
     Rule(Rule),
-    Seal { did: DomainId },
-    Emit { did: DomainId },
+    Seal(DomainId),
+    Emit(DomainId),
 }
 
 #[derive(Debug)]

@@ -209,7 +209,7 @@ impl Atom {
     ) -> Result<(), ()> {
         // println!("{:?}", (self, ra));
         match (self, ra) {
-            (atom1, RuleAtom::Variable { vid }) => va.insert(vid, atom1.clone()),
+            (atom1, RuleAtom::Variable(vid)) => va.insert(vid, atom1.clone()),
             (Atom::Construct { args: atoms, .. }, RuleAtom::Construct { args: rule_atoms, .. }) => {
                 if atoms.len() == rule_atoms.len() {
                     for (atom, rule_atom) in atoms.iter().zip(rule_atoms) {
@@ -220,7 +220,7 @@ impl Atom {
                     Err(())
                 }
             }
-            (Atom::Constant { c: c1 }, RuleAtom::Constant { c: c2 }) => {
+            (Atom::Constant { c: c1 }, RuleAtom::Constant(c2)) => {
                 if c1 == c2 {
                     Ok(())
                 } else {
@@ -235,8 +235,8 @@ impl Atom {
 impl RuleAtom {
     fn concretize(&self, va: &VariableAssignments) -> Result<Atom, ()> {
         match self {
-            RuleAtom::Variable { vid } => va.get(vid).ok_or(()).cloned(),
-            RuleAtom::Constant { c } => Ok(Atom::Constant { c: c.clone() }),
+            RuleAtom::Variable(vid) => va.get(vid).ok_or(()).cloned(),
+            RuleAtom::Constant(c) => Ok(Atom::Constant { c: c.clone() }),
             RuleAtom::Construct { args, did } => Ok(Atom::Construct {
                 args: args.iter().map(|ra| ra.concretize(va)).collect::<Result<Vec<_>, _>>()?,
                 did: did.clone(),
@@ -271,18 +271,6 @@ impl Rule {
     ) {
         match tail {
             [] => {
-                // for debugging...
-                // print!("CONCRETE RULE ");
-                // for consequent in self.consequents.iter() {
-                //     let atom = consequent.concretize(va).expect("should work");
-                //     print!("{:?} ", atom);
-                // }
-                // print!(":- ");
-                // for antecedent in self.antecedents.iter() {
-                //     let atom = antecedent.ra.concretize(va).expect("should work");
-                //     print!("{}{:?} ", (if antecedent.sign == Sign::Pos { "" } else { "!" }), atom);
-                // }
-                // println!();
                 // perform all checks
                 let checks_pass = self.antecedents.iter().all(|antecedent| {
                     let did = antecedent.ra.domain_id(v2d).expect("static checked");
@@ -290,14 +278,7 @@ impl Rule {
                         let atom = antecedent.ra.concretize(va).expect("should work");
                         match antecedent.sign {
                             Sign::Pos => todo!(),
-                            Sign::Neg => {
-                                let res = neg.contains(did, &atom);
-                                // println!(
-                                //     "neg:{:?} pos_r:{:?} atom:{:?} check_res:{:?}",
-                                //     neg, pos_r, atom, res
-                                // );
-                                res
-                            }
+                            Sign::Neg => neg.contains(did, &atom),
                         }
                     } else {
                         // this one is enumerated. no need to check
@@ -309,7 +290,6 @@ impl Rule {
                     for consequent in self.consequents.iter() {
                         let did = consequent.domain_id(v2d).expect("static checked");
                         let atom = consequent.concretize(va).expect("should work");
-                        // println!("!! inserting {:?} {:?}", did, atom);
                         pos_w.insert(did, atom);
                     }
                 }
@@ -319,12 +299,9 @@ impl Rule {
                     // bind all true atoms that match!
                     assert_eq!(head.sign, Sign::Pos);
                     for atom in pos_r.iter_did(did) {
-                        // // println!("ASSIGN_BEFORE {:?}", va);
-
                         let state_token = va.get_state_token();
                         if atom.uniquely_assign_variables(&head.ra, va).is_ok() {
-                            // // println!("AFTER {:?}", va);
-                            self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail);
+                            self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail)
                         }
                         va.restore_state(state_token).expect("oh no");
                     }

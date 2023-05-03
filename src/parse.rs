@@ -83,14 +83,14 @@ pub fn program(mut i: &str) -> IResult<&str, Program> {
 }
 
 fn decl(i: &str) -> IResult<&str, Statement> {
-    nommap(domain_id, |did| Statement::Decl { did })(i)
+    nommap(domain_id, Statement::Decl)(i)
 }
 fn emit(i: &str) -> IResult<&str, Statement> {
-    nommap(domain_id, |did| Statement::Emit { did })(i)
+    nommap(domain_id, Statement::Emit)(i)
 }
 
 fn seal(i: &str) -> IResult<&str, Statement> {
-    nommap(domain_id, |did| Statement::Seal { did })(i)
+    nommap(domain_id, Statement::Seal)(i)
 }
 
 fn defn(i: &str) -> IResult<&str, Statement> {
@@ -123,7 +123,7 @@ fn domain_id(i: &str) -> IResult<&str, DomainId> {
 fn variable(i: &str) -> IResult<&str, RuleAtom> {
     let vid = recognize(pair(satisfy(|c| c.is_ascii_uppercase()), id_suffix));
     let variable_id = nommap(ws(vid), |ident| VariableId(ident.to_owned()));
-    nommap(variable_id, |vid| RuleAtom::Variable { vid })(i)
+    nommap(variable_id, RuleAtom::Variable)(i)
 }
 
 fn constant(i: &str) -> IResult<&str, RuleAtom> {
@@ -132,7 +132,7 @@ fn constant(i: &str) -> IResult<&str, RuleAtom> {
         delimited(tag("\""), recognize(many0_count(none_of("\""))), tag("\"")),
         |c: &str| Constant::Str(c.to_owned()),
     );
-    nommap(ws(alt((int_constant, str_constant))), |c| RuleAtom::Constant { c })(i)
+    nommap(ws(alt((int_constant, str_constant))), RuleAtom::Constant)(i)
 }
 
 fn construct(i: &str) -> IResult<&str, RuleAtom> {
