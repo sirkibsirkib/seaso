@@ -2,6 +2,7 @@ mod ast;
 mod dynamics;
 mod parse;
 mod preprocessing;
+// mod print;
 mod statics;
 
 fn stdin_to_string() -> Result<String, std::io::Error> {
@@ -35,6 +36,7 @@ fn main() -> Result<(), ()> {
                 &den.trues, &den.unknowns, &den.emissions,
             );
         }
+        // println!("program {}", program.printed(true));
         println!("seal broken: {:?}", program.seal_break());
         println!("undeclared domains: {:?}", program.undeclared_domains());
         println!("check result {:#?}", check_result.as_ref().map(drop));
