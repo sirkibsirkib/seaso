@@ -1,4 +1,4 @@
-defn trust(party,party). trusted(party). party(str). untrusted(party).
+defn party(str). trust(party,party). trusted(party). untrusted(party).
      very_trusted(party). eq(party,party).
 emit untrusted.
 
