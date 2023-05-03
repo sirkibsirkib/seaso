@@ -121,7 +121,8 @@ fn domain_id(i: &str) -> IResult<&str, DomainId> {
 }
 
 fn variable(i: &str) -> IResult<&str, RuleAtom> {
-    let vid = recognize(pair(satisfy(|c| c.is_ascii_uppercase()), id_suffix));
+    let some_vid = recognize(pair(satisfy(|c| c.is_ascii_uppercase()), id_suffix));
+    let vid = alt((some_vid, tag("_")));
     let variable_id = nommap(ws(vid), |ident| VariableId(ident.to_owned()));
     nommap(variable_id, RuleAtom::Variable)(i)
 }

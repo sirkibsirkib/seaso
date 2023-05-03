@@ -20,7 +20,7 @@ pub struct Knowledge {
 pub struct Denotation {
     pub trues: Knowledge,
     pub unknowns: Knowledge,
-    pub emitted: Knowledge,
+    pub emissions: Knowledge,
 }
 
 #[derive(Debug, Default)]
@@ -153,8 +153,8 @@ impl Program {
                         for (did, set) in unknowns.map.iter_mut() {
                             set.retain(|atom| !trues.contains(did, atom))
                         }
-                        let emitted_dids = self.emitted();
-                        let emitted = Knowledge {
+                        let emitted_dids = self.emitted_domains();
+                        let emissions = Knowledge {
                             map: trues
                                 .map
                                 .iter()
@@ -167,7 +167,7 @@ impl Program {
                                 })
                                 .collect(),
                         };
-                        return Denotation { trues, unknowns, emitted };
+                        return Denotation { trues, unknowns, emissions };
                     }
                 }
             }
@@ -179,7 +179,7 @@ impl Program {
 }
 
 impl Knowledge {
-    fn iter_did(&self, did: &DomainId) -> impl Iterator<Item = &Atom> + '_ {
+    fn atoms_in_domain(&self, did: &DomainId) -> impl Iterator<Item = &Atom> + '_ {
         self.map.get(did).into_iter().flat_map(|set| set.iter())
     }
     fn contains(&self, did: &DomainId, atom: &Atom) -> bool {
@@ -207,7 +207,6 @@ impl Atom {
         ra: &RuleAtom,
         va: &mut VariableAssignments,
     ) -> Result<(), ()> {
-        // println!("{:?}", (self, ra));
         match (self, ra) {
             (atom1, RuleAtom::Variable(vid)) => va.insert(vid, atom1.clone()),
             (Atom::Construct { args: atoms, .. }, RuleAtom::Construct { args: rule_atoms, .. }) => {
@@ -254,8 +253,7 @@ impl Rule {
         pos_w: &mut Knowledge,
         va: &mut VariableAssignments,
     ) {
-        // let mut va = VariableAssignments::default();
-        // dbg!(self);
+        // println!("inference with va {:?}", va);
         self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, &self.antecedents);
         va.assignments.clear();
     }
@@ -273,15 +271,11 @@ impl Rule {
             [] => {
                 // perform all checks
                 let checks_pass = self.antecedents.iter().all(|antecedent| {
-                    let did = antecedent.ra.domain_id(v2d).expect("static checked");
-                    if antecedent.is_enumerable_in(v2d).is_none() {
+                    if antecedent.sign == Sign::Neg {
+                        let did = antecedent.ra.domain_id(v2d).expect("static checked");
                         let atom = antecedent.ra.concretize(va).expect("should work");
-                        match antecedent.sign {
-                            Sign::Pos => todo!(),
-                            Sign::Neg => neg.contains(did, &atom),
-                        }
+                        neg.contains(&did, &atom)
                     } else {
-                        // this one is enumerated. no need to check
                         true
                     }
                 });
@@ -290,15 +284,14 @@ impl Rule {
                     for consequent in self.consequents.iter() {
                         let did = consequent.domain_id(v2d).expect("static checked");
                         let atom = consequent.concretize(va).expect("should work");
-                        pos_w.insert(did, atom);
+                        pos_w.insert(&did, atom);
                     }
                 }
             }
-            [head, new_tail @ ..] => match head.is_enumerable_in(v2d) {
-                Some(did) => {
-                    // bind all true atoms that match!
-                    assert_eq!(head.sign, Sign::Pos);
-                    for atom in pos_r.iter_did(did) {
+            [head, new_tail @ ..] => match head.sign {
+                Sign::Pos => {
+                    let did = head.ra.domain_id(v2d).expect("BAD");
+                    for atom in pos_r.atoms_in_domain(&did) {
                         let state_token = va.get_state_token();
                         if atom.uniquely_assign_variables(&head.ra, va).is_ok() {
                             self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail)
@@ -306,7 +299,7 @@ impl Rule {
                         va.restore_state(state_token).expect("oh no");
                     }
                 }
-                None => self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail),
+                Sign::Neg => self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail),
             },
         }
     }

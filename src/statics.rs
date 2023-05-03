@@ -21,10 +21,8 @@ pub enum StmtCheckErr {
     UndefinedConstructor { did: DomainId },
     OneVariableTwoTypes { vid: VariableId, domains: [DomainId; 2] },
     NoTypes { vid: VariableId },
-    WrongArity { did: DomainId, param_count: usize, args: usize },
+    WrongArity { did: DomainId, param_count: usize, arg_count: usize },
     VariableNotEnumerable { vid: VariableId },
-    PrimitiveConsequent { did: DomainId },
-    PrimitiveAntecedent { did: DomainId },
     ConflictingDefinition { did: DomainId, previous_sidx: StatementIdx },
     MistypedArgument { constructor: DomainId, expected: DomainId, got: DomainId },
     DefiningPrimitive { did: DomainId },
@@ -43,7 +41,7 @@ impl DomainId {
 
 impl Program {
     /// Used to filter the truths of the denotation.
-    pub fn emitted(&self) -> HashSet<&DomainId> {
+    pub fn emitted_domains(&self) -> HashSet<&DomainId> {
         self.statements
             .iter()
             .filter_map(|statement| match statement {
@@ -69,7 +67,7 @@ impl Program {
             .enumerate()
             .flat_map(|(sidx, statement)| {
                 statement
-                    .rule_typing(&dd)
+                    .rule_type_variables(&dd)
                     .map(|x| x.map(|x| (sidx, x)).map_err(|err| CheckErr { sidx, err }))
             })
             .collect()
@@ -128,16 +126,14 @@ impl Program {
     /// Returns the unique definition of each defined domain
     fn domain_definitions(&self) -> Result<DomainDefinitions, CheckErr> {
         let mut dd = DomainDefinitions::default();
-
         let mut f = |sidx, statement: &Statement| {
             if let Statement::Defn { did, params } = statement {
                 if did.is_primitive() {
                     return Err(StmtCheckErr::DefiningPrimitive { did: did.clone() });
                 }
                 let value = (sidx, params.clone());
-                if let Some((previous_sidx, previous_params)) =
-                    dd.insert(did.clone(), value.clone())
-                {
+                let prev = dd.insert(did.clone(), value.clone());
+                if let Some((previous_sidx, previous_params)) = prev {
                     if &previous_params != params {
                         return Err(StmtCheckErr::ConflictingDefinition {
                             previous_sidx,
@@ -174,6 +170,7 @@ impl DomainId {
 }
 
 impl Statement {
+    /// Returns all domain IDs within. Used to check if all are declared.
     fn occurring_domain_ids<'a>(&'a self, x: &mut HashSet<&'a DomainId>) {
         match self {
             Statement::Defn { did, params } => {
@@ -188,49 +185,39 @@ impl Statement {
             Statement::Rule(..) => {}
         }
     }
-    fn rule_typing(&self, dd: &DomainDefinitions) -> Option<Result<VariableTypes, StmtCheckErr>> {
-        match self {
-            Statement::Rule(Rule { consequents, antecedents }) => {
-                let mut vt = VariableTypes::default();
-                let mut vids = HashSet::<VariableId>::default();
-                for ra in consequents.iter().chain(antecedents.iter().map(|lit| &lit.ra)) {
-                    ra.variables(&mut vids);
-                    if let Err(err) = ra.typing(dd, &mut vt) {
-                        return Some(Err(err));
+
+    /// Returns a unique, consistent assignment to each occurring variable, if they exist.
+    fn rule_type_variables(
+        &self,
+        dd: &DomainDefinitions,
+    ) -> Option<Result<VariableTypes, StmtCheckErr>> {
+        if let Statement::Rule(Rule { consequents, antecedents }) = self {
+            let mut vt = VariableTypes::default();
+            let mut vids = HashSet::<VariableId>::default();
+            for ra in consequents.iter().chain(antecedents.iter().map(|lit| &lit.ra)) {
+                ra.variables(&mut vids);
+                if let Err(err) = ra.type_variables(dd, &mut vt) {
+                    return Some(Err(err));
+                }
+            }
+            Some(if let Some(vid) = vids.iter().find(|&vid| !vt.contains_key(vid)) {
+                Err(StmtCheckErr::NoTypes { vid: vid.clone() })
+            } else {
+                // enumerability check
+                let mut enumerable = HashSet::default();
+                for antecedent in antecedents {
+                    if let RuleLiteral { sign: Sign::Pos, ra } = antecedent {
+                        ra.variables(&mut enumerable);
                     }
                 }
-                Some(if let Some(vid) = vids.iter().find(|&vid| !vt.contains_key(vid)) {
-                    Err(StmtCheckErr::NoTypes { vid: vid.clone() })
+                if let Some(vid) = vids.difference(&enumerable).next() {
+                    Err(StmtCheckErr::VariableNotEnumerable { vid: vid.clone() })
                 } else {
-                    // enumerability check
-                    let mut enumerable = HashSet::default();
-                    for antecedent in antecedents {
-                        antecedent.variables_if_enumerable(&vt, &mut enumerable);
-                    }
-                    for consequent in consequents.iter() {
-                        let did = consequent.domain_id(&vt).unwrap();
-                        if did.is_primitive() {
-                            return Some(Err(StmtCheckErr::PrimitiveConsequent {
-                                did: did.clone(),
-                            }));
-                        }
-                    }
-                    for antecedent in antecedents.iter() {
-                        let did = antecedent.ra.domain_id(&vt).unwrap();
-                        if did.is_primitive() {
-                            return Some(Err(StmtCheckErr::PrimitiveAntecedent {
-                                did: did.clone(),
-                            }));
-                        }
-                    }
-                    if let Some(vid) = vids.difference(&enumerable).next() {
-                        Err(StmtCheckErr::VariableNotEnumerable { vid: vid.clone() })
-                    } else {
-                        Ok(vt)
-                    }
-                })
-            }
-            _ => None,
+                    Ok(vt)
+                }
+            })
+        } else {
+            None
         }
     }
 }
@@ -248,17 +235,6 @@ impl Constant {
 }
 
 impl RuleAtom {
-    // fn occurring_domain_ids<'a>(&'a self, x: &mut HashSet<&'a DomainId>) {
-    //     match self {
-    //         RuleAtom::Construct { did, args } => {
-    //             x.insert(did);
-    //             for arg in args {
-    //                 arg.occurring_domain_ids(x)
-    //             }
-    //         }
-    //         _ => {}
-    //     }
-    // }
     fn apparent_did(&self) -> Option<DomainId> {
         match self {
             RuleAtom::Construct { did, .. } => Some(did.clone()),
@@ -266,44 +242,45 @@ impl RuleAtom {
             RuleAtom::Variable { .. } => None,
         }
     }
-    fn typing(&self, dd: &DomainDefinitions, vt: &mut VariableTypes) -> Result<(), StmtCheckErr> {
-        match self {
-            RuleAtom::Construct { did, args } => {
-                let (_defn_sidx, param_dids) =
-                    dd.get(did).ok_or(StmtCheckErr::UndefinedConstructor { did: did.clone() })?;
-                if param_dids.len() != args.len() {
-                    return Err(StmtCheckErr::WrongArity {
-                        did: did.clone(),
-                        param_count: param_dids.len(),
-                        args: args.len(),
-                    });
-                }
-                for (arg, param_did) in args.iter().zip(param_dids.iter()) {
-                    if let RuleAtom::Variable(vid) = arg {
-                        match vt.insert(vid.clone(), param_did.clone()) {
-                            Some(param_did2) if param_did != &param_did2 => {
-                                return Err(StmtCheckErr::OneVariableTwoTypes {
-                                    vid: vid.clone(),
-                                    domains: [param_did.clone(), param_did2.clone()],
-                                });
-                            }
-                            _ => {}
-                        }
-                    } else if let Some(arg_did) = arg.apparent_did() {
-                        if &arg_did != param_did {
-                            return Err(StmtCheckErr::MistypedArgument {
-                                constructor: did.clone(),
-                                expected: param_did.clone(),
-                                got: arg_did,
+    fn type_variables(
+        &self,
+        dd: &DomainDefinitions,
+        vt: &mut VariableTypes,
+    ) -> Result<(), StmtCheckErr> {
+        if let RuleAtom::Construct { did, args } = self {
+            let (_defn_sidx, param_dids) =
+                dd.get(did).ok_or(StmtCheckErr::UndefinedConstructor { did: did.clone() })?;
+            if param_dids.len() != args.len() {
+                return Err(StmtCheckErr::WrongArity {
+                    did: did.clone(),
+                    param_count: param_dids.len(),
+                    arg_count: args.len(),
+                });
+            }
+            for (arg, param_did) in args.iter().zip(param_dids.iter()) {
+                if let RuleAtom::Variable(vid) = arg {
+                    match vt.insert(vid.clone(), param_did.clone()) {
+                        Some(param_did2) if param_did != &param_did2 => {
+                            return Err(StmtCheckErr::OneVariableTwoTypes {
+                                vid: vid.clone(),
+                                domains: [param_did.clone(), param_did2.clone()],
                             });
                         }
+                        _ => {}
+                    }
+                } else if let Some(arg_did) = arg.apparent_did() {
+                    if &arg_did != param_did {
+                        return Err(StmtCheckErr::MistypedArgument {
+                            constructor: did.clone(),
+                            expected: param_did.clone(),
+                            got: arg_did,
+                        });
                     }
                 }
-                for arg in args {
-                    arg.typing(dd, vt)?
-                }
             }
-            _ => {}
+            for arg in args {
+                arg.type_variables(dd, vt)?
+            }
         }
         Ok(())
     }
@@ -318,50 +295,11 @@ impl RuleAtom {
             }
         }
     }
-    // NOTE: assumes `vt` covers all occurring variables
-    pub fn domain_id<'a: 'c, 'b: 'c, 'c>(&'a self, vt: &'b VariableTypes) -> Option<&'c DomainId> {
+    pub fn domain_id(&self, vt: &VariableTypes) -> Result<DomainId, ()> {
         match self {
-            RuleAtom::Construct { did, .. } => Some(did),
-            RuleAtom::Variable(vid) => vt.get(vid),
-            _ => None,
-        }
-    }
-}
-
-impl RuleLiteral {
-    pub fn is_enumerable_in<'a: 'c, 'b: 'c, 'c>(
-        &'a self,
-        vt: &'b VariableTypes,
-    ) -> Option<&'c DomainId> {
-        if self.sign == Sign::Pos {
-            let did = match &self.ra {
-                RuleAtom::Construct { did, .. } => did,
-                RuleAtom::Variable(vid) => vt.get(vid).expect("Checked before, I think"),
-                _ => return None,
-            };
-            if !did.is_primitive() {
-                return Some(did);
-            }
-        };
-        None
-    }
-    // NOTE: assumes `vt` covers all occurring variables
-    fn variables_if_enumerable(&self, vt: &VariableTypes, variables: &mut HashSet<VariableId>) {
-        if self.sign == Sign::Pos {
-            match &self.ra {
-                RuleAtom::Construct { did, args } if !did.is_primitive() => {
-                    for arg in args {
-                        arg.variables(variables)
-                    }
-                }
-                RuleAtom::Variable(vid) => {
-                    let did = vt.get(vid).expect("Checked before, I think");
-                    if !did.is_primitive() {
-                        self.ra.variables(variables)
-                    }
-                }
-                _ => {}
-            }
+            RuleAtom::Construct { did, .. } => Ok(did.clone()),
+            RuleAtom::Variable(vid) => vt.get(vid).ok_or(()).cloned(),
+            RuleAtom::Constant(c) => Ok(c.domain_id()),
         }
     }
 }

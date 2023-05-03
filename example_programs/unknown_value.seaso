@@ -1,0 +1,4 @@
+defn known(). unknown1(). unknown2().
+rule unknown1() :- !unknown2(), known().
+     unknown2() :- !unknown1().
+     known().

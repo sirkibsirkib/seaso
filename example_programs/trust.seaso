@@ -1,0 +1,15 @@
+defn trust(party,party). trusted(party). party(str). untrusted(party).
+     very_trusted(party). eq(party,party).
+emit untrusted.
+
+rule Truster, Trustee :- trust(Truster, Trustee).
+     very_trusted(P1) :- trust(P2,P1), trust(P3,P1), !eq(P2,P3).
+     eq(X,X) :- X.
+
+# P is untrusted if there does not exist another Q that trusts P.
+rule trusted(Trustee) :- trust(Truster,Trustee).
+     untrusted(Trustee) :- Trustee, !trusted(Trustee). 
+
+rule trust(party("Amy"),party("Bob")).
+     trust(party("Dan"),party("Bob")).
+     trust(party("Amy"),party("Dan")).
