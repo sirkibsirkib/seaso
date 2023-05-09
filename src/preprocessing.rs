@@ -10,7 +10,7 @@ trait DeanonymizeVids {
 
 ////////////////
 
-pub fn line_comments_removed(mut s: String) -> String {
+pub fn remove_line_comments(s: &mut String) {
     let mut outside_comment = true;
     s.retain(|c| {
         if c == '#' {
@@ -19,14 +19,12 @@ pub fn line_comments_removed(mut s: String) -> String {
             outside_comment = true;
         }
         outside_comment
-    });
-    s
+    })
 }
 
-pub fn variable_ids_deanonymized(mut program: Program) -> Program {
-    let mut ava = AnonVariableAllocator { next: 0 };
-    program.deanonymize_vids(&mut ava);
-    program
+pub fn deanonymize_variable_ids(program: &mut Program) {
+    // let mut ava = AnonVariableAllocator { next: 0 };
+    program.deanonymize_vids(&mut AnonVariableAllocator { next: 0 })
 }
 
 impl DeanonymizeVids for Program {

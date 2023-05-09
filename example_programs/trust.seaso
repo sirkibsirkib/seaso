@@ -1,5 +1,6 @@
-defn party(str). trust(party,party). trusted(party). untrusted(party).
-     very_trusted(party). eq(party,party).
+defn party(str). trust(party,party).
+     trusted(party). untrusted(party). very_trusted(party).
+     eq(party,party).
 emit untrusted.
 
 rule Truster, Trustee :- trust(Truster, Trustee).

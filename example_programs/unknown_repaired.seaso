@@ -6,4 +6,4 @@ rule unknown1() :- !unknown2(), known().
      known().
 
 # ... but this fixes it. "unknown2" is true, hence "unknown1" is false.
-rule unknown2() :- known().
+rule unknown2().

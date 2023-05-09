@@ -22,12 +22,13 @@ struct TimesTaken {
 }
 
 fn main() -> Result<(), ()> {
-    let source = preprocessing::line_comments_removed(stdin_to_string().expect("bad stdin"));
+    let mut source = stdin_to_string().expect("bad stdin");
+    preprocessing::remove_line_comments(&mut source);
     let start_i0 = Instant::now();
-    let parse_result = parse::program(&source)
-        .map(|(s, program)| (s, preprocessing::variable_ids_deanonymized(program)));
+    let mut parse_result = parse::program(&source);
     let start_i1 = Instant::now();
-    if let Ok((_input, program)) = &parse_result {
+    if let Ok((_input, program)) = &mut parse_result {
+        preprocessing::deanonymize_variable_ids(program);
         let check_result = program.check();
         let start_i2 = Instant::now();
         if let Ok(r2v2d) = &check_result {
