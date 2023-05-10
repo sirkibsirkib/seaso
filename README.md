@@ -75,5 +75,5 @@ parse error None
 ## Source and library
 
 Source code documentation can be generated with `cargo doc --no-deps`, producing HTML documentation in `target\doc`.
-For extra convenience, run with `cargo doc --no-deps --open`.
-The repo can be used as a rust dependency as usual (see `crates.io` for some examples).
+For extra convenience, run with `cargo doc --no-deps --open` to open the docs in your default browser.
+The repo can be used as a Rust dependency as usual (see `crates.io` for some examples).
