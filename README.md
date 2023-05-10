@@ -11,12 +11,15 @@ Both of these can be conveniently installed using `rustup`, the Rust package man
 
 ### Compilation
 To acquire and compile from source:
-1. Use `git` to clone this repo.
+1. Acquire a local copy of this repository (e.g. by using `git clone`).
 2. Working in the cloned directory, compile with `cargo build --release`.
 The compiled binary ('the Seaso executor') will be found at `./target/release/seaso` (or `.\target\release\seaso.exe` on Windows).
 
 ### Usage
-Run the Seaso executor, feeding in your source code as standard input. For example, run `./target/release/seaso.exe < ./program_examples/trust.seaso`.
+Run the Seaso executor, feeding in your source code as standard input. For example, run the following:
+```
+./target/release/seaso.exe < ./program_examples/trust.seaso`
+```
 
 ### Output
 
@@ -32,7 +35,7 @@ TimesTaken {
     denote: 796.8µs,
 }
 Denotation {
-    trues: {
+    truths: {
         eq: [
             eq(party("Amy"), party("Amy")),
             eq(party("Bob"), party("Bob")),
