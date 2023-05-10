@@ -1,0 +1,3 @@
+defn x(int,int).
+rule L,R :- x(L,R).
+     x(1,2).

@@ -6,10 +6,13 @@ use std::collections::{HashMap, HashSet};
 type DomainDefinitions = HashMap<DomainId, (StatementIdx, Vec<DomainId>)>;
 
 /// These annotate programs to create the internal representation.
-/// Ultimnately, they prescribe exactly one type to each variable in each rule.
+/// Ultimately, they prescribe exactly one type to each variable in each rule.
 pub type RuleVariableTypes = HashMap<StatementIdx, VariableTypes>;
+
+/// These annotate statements, prescribing exactly one type to each variable.
 pub type VariableTypes = HashMap<VariableId, DomainId>;
 
+/// Error resulting from checking a program. Bundles the `StatementCheckErr` with a statement and statement index for convenient debugging.
 #[derive(Debug)]
 pub struct CheckErr<'a> {
     pub statement_index: StatementIdx,
@@ -17,6 +20,7 @@ pub struct CheckErr<'a> {
     pub error: StatementCheckErr,
 }
 
+/// Error within a particular statement resulting from checking a program.
 #[derive(Debug)]
 pub enum StatementCheckErr {
     UndefinedConstructor(DomainId),
@@ -29,6 +33,7 @@ pub enum StatementCheckErr {
     DefiningPrimitive(DomainId),
 }
 
+/// Identifies which statements first seal and then modify which domain.
 #[derive(Debug)]
 pub struct SealBreak {
     pub sealed: StatementIdx,
@@ -36,8 +41,26 @@ pub struct SealBreak {
     pub did: DomainId,
 }
 
+/// Bundles together a `Program` and a `RuleVariableTypes` produced by checking it.
+#[derive(Debug)]
+pub struct Checked<'a> {
+    pub(crate) program: &'a Program,
+    pub(crate) rvt: RuleVariableTypes,
+}
+
 impl DomainId {
-    const PRIMITIVE_STRS: [&str; 2] = ["str", "int"];
+    pub const PRIMITIVE_STRS: [&str; 2] = ["str", "int"];
+}
+
+impl Into<RuleVariableTypes> for Checked<'_> {
+    fn into(self) -> RuleVariableTypes {
+        self.rvt
+    }
+}
+impl AsRef<RuleVariableTypes> for Checked<'_> {
+    fn as_ref(&self) -> &RuleVariableTypes {
+        &self.rvt
+    }
 }
 
 impl Program {
@@ -58,7 +81,7 @@ impl Program {
     /// understood as the internal representation.
     /// Note, the other well-formedness criteria can be checked separately,
     /// e.g., using `undeclared_domains`.
-    pub fn check(&self) -> Result<RuleVariableTypes, CheckErr> {
+    pub fn check(&self) -> Result<Checked, CheckErr> {
         let dd = self.domain_definitions()?;
         self.statements
             .iter()
@@ -72,7 +95,8 @@ impl Program {
                     })
                 })
             })
-            .collect()
+            .collect::<Result<_, _>>()
+            .map(|rvt| Checked { program: self, rvt })
     }
 
     /// Returns all domains used but not declared, which is trivially
@@ -126,7 +150,7 @@ impl Program {
     }
 
     /// Returns the unique definition of each defined domain
-    fn domain_definitions(&self) -> Result<DomainDefinitions, CheckErr> {
+    pub fn domain_definitions(&self) -> Result<DomainDefinitions, CheckErr> {
         let mut dd = DomainDefinitions::default();
         let mut f = |sidx, statement: &Statement| {
             if let Statement::Defn { did, params } = statement {
@@ -156,8 +180,8 @@ impl Program {
         Ok(dd)
     }
 
-    /// Returns the set of all declared domains
-    fn declarations(&self) -> HashSet<DomainId> {
+    /// Returns the set of all declared domains.
+    pub fn declarations(&self) -> HashSet<DomainId> {
         self.statements
             .iter()
             .filter_map(|statement| match statement {
@@ -170,7 +194,7 @@ impl Program {
 }
 
 impl DomainId {
-    fn is_primitive(&self) -> bool {
+    pub fn is_primitive(&self) -> bool {
         Self::PRIMITIVE_STRS.as_slice().contains(&self.0.as_ref())
     }
 }
@@ -229,7 +253,7 @@ impl Statement {
 }
 
 impl Constant {
-    fn domain_id(&self) -> DomainId {
+    pub fn domain_id(&self) -> DomainId {
         DomainId(
             match self {
                 Self::Int { .. } => "int",
@@ -241,7 +265,7 @@ impl Constant {
 }
 
 impl RuleAtom {
-    fn apparent_did(&self) -> Option<DomainId> {
+    pub fn apparent_did(&self) -> Option<DomainId> {
         match self {
             RuleAtom::Construct { did, .. } => Some(did.clone()),
             RuleAtom::Constant(c) => Some(c.domain_id()),

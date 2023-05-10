@@ -1,20 +1,24 @@
 # Seaso Executor
+This contains the source code of the Seaso executor, which can be compiled to a standalone executable, or used as a Rust library.
 
-## Preparation
+## Executable
+
+### Preparation
 You will need:
 1. `rustc`: the Rust language compiler `rustc` (https://www.rust-lang.org/). I am using `rustc` version 1.69, but many older versions will do fine. (If it complies, all is well).
 2. `cargo`: the Rust package manager.
 Both of these can be conveniently installed using `rustup`, the Rust package manager (https://rustup.rs/).
 
+### Compilation
 To acquire and compile from source:
 1. Use `git` to clone this repo.
 2. Working in the cloned directory, compile with `cargo build --release`.
 The compiled binary ('the Seaso executor') will be found at `./target/release/seaso` (or `.\target\release\seaso.exe` on Windows).
 
-## Usage
+### Usage
 Run the Seaso executor, feeding in your source code as standard input. For example, run `./target/release/seaso.exe < ./program_examples/toy1.seaso`.
 
-## Output
+### Output
 
 Once the Seaso executor has consumed all standard input, it will parse and check if your Seaso program is well-formed, and if, so, will compute and output its denotation.
 The denotation consists of three sets of atoms: _truths_, _unknowns_, and _emissions_.
@@ -68,3 +72,9 @@ check error None
 parse error None
 ```
 
+## Source and library
+
+This section is for those interested in scrutinizing or using the source code itself.
+Source code documentation can be generated with `cargo doc --no-deps`, producing HTML documentation in `target\doc`.
+For extra convenience, run with `cargo doc --no-deps --open`.
+The repo can be used as a rust dependency as usual (see `crates.io` for some examples).

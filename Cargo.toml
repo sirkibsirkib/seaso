@@ -5,3 +5,11 @@ edition = "2021"
 
 [dependencies]
 nom = "7.1.3" # parser combinators used in ./parse.rs
+
+# [lib]
+# name = "seaso_lib"
+# path = "src/lib.rs"
+
+# [[bin]]
+# name = "seaso_bin"
+# path = "src/main.rs"

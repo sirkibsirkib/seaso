@@ -13,7 +13,7 @@ use nom::{
 
 ////////// PARSER COMBINATORS //////////
 
-fn wsl<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
+pub fn wsl<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
     E: ParseError<&'a str>,
     F: FnMut(&'a str) -> IResult<&'a str, O, E> + 'a,
@@ -21,7 +21,7 @@ where
     preceded(multispace0, inner)
 }
 
-fn wsr<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
+pub fn wsr<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
     E: ParseError<&'a str>,
     F: FnMut(&'a str) -> IResult<&'a str, O, E> + 'a,
@@ -29,7 +29,7 @@ where
     terminated(inner, multispace0)
 }
 
-fn ws<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
+pub fn ws<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
     E: ParseError<&'a str> + 'a,
     F: FnMut(&'a str) -> IResult<&'a str, O, E> + 'a,
@@ -38,7 +38,7 @@ where
     wsl(wsr(inner))
 }
 
-fn commasep<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<O>, E>
+pub fn commasep<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<O>, E>
 where
     E: ParseError<&'a str> + 'a,
     F: FnMut(&'a str) -> IResult<&'a str, O, E> + 'a,
@@ -47,7 +47,7 @@ where
     separated_list0(ws(tag(",")), inner)
 }
 
-fn list<'a, F: 'a, O: 'a, E: ParseError<&'a str> + 'a>(
+pub fn list<'a, F: 'a, O: 'a, E: ParseError<&'a str> + 'a>(
     inner: F,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<O>, E>
 where
@@ -57,7 +57,7 @@ where
     delimited(ws(tag("(")), commasep(inner), ws(tag(")")))
 }
 
-fn stmt<'a, F: FnMut(&'a str) -> IResult<&'a str, Statement> + 'a>(
+pub fn stmt<'a, F: FnMut(&'a str) -> IResult<&'a str, Statement> + 'a>(
     string: &'a str,
     inner: F,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<Statement>> + 'a {
@@ -82,24 +82,24 @@ pub fn program(mut i: &str) -> IResult<&str, Program> {
     Ok((i, program))
 }
 
-fn decl(i: &str) -> IResult<&str, Statement> {
+pub fn decl(i: &str) -> IResult<&str, Statement> {
     nommap(domain_id, Statement::Decl)(i)
 }
-fn emit(i: &str) -> IResult<&str, Statement> {
+pub fn emit(i: &str) -> IResult<&str, Statement> {
     nommap(domain_id, Statement::Emit)(i)
 }
 
-fn seal(i: &str) -> IResult<&str, Statement> {
+pub fn seal(i: &str) -> IResult<&str, Statement> {
     nommap(domain_id, Statement::Seal)(i)
 }
 
-fn defn(i: &str) -> IResult<&str, Statement> {
+pub fn defn(i: &str) -> IResult<&str, Statement> {
     let (i, did) = domain_id(i)?;
     let (i, params) = list(domain_id)(i)?;
     Ok((i, Statement::Defn { did, params }))
 }
 
-fn rule(i: &str) -> IResult<&str, Statement> {
+pub fn rule(i: &str) -> IResult<&str, Statement> {
     let c = commasep(rule_atom);
     let a = alt((
         preceded(ws(tag(":-")), commasep(rule_literal)),
@@ -111,23 +111,23 @@ fn rule(i: &str) -> IResult<&str, Statement> {
 
 ////////// (SUB)EXPRESSION-LEVEL PARSERS //////////
 
-fn id_suffix(i: &str) -> IResult<&str, &str> {
+pub fn id_suffix(i: &str) -> IResult<&str, &str> {
     recognize(many0_count(alt((tag("_"), alphanumeric1))))(i)
 }
 
-fn domain_id(i: &str) -> IResult<&str, DomainId> {
+pub fn domain_id(i: &str) -> IResult<&str, DomainId> {
     let did = recognize(pair(satisfy(|c| c.is_ascii_lowercase()), id_suffix));
     nommap(ws(did), |ident| DomainId(ident.to_owned()))(i)
 }
 
-fn variable(i: &str) -> IResult<&str, RuleAtom> {
+pub fn variable(i: &str) -> IResult<&str, RuleAtom> {
     let some_vid = recognize(pair(satisfy(|c| c.is_ascii_uppercase()), id_suffix));
     let vid = alt((some_vid, tag("_")));
     let variable_id = nommap(ws(vid), |ident| VariableId(ident.to_owned()));
     nommap(variable_id, RuleAtom::Variable)(i)
 }
 
-fn constant(i: &str) -> IResult<&str, RuleAtom> {
+pub fn constant(i: &str) -> IResult<&str, RuleAtom> {
     let int_constant = nommap(nomi64, |c| Constant::Int(c));
     let str_constant = nommap(
         delimited(tag("\""), recognize(many0_count(none_of("\""))), tag("\"")),
@@ -136,16 +136,16 @@ fn constant(i: &str) -> IResult<&str, RuleAtom> {
     nommap(ws(alt((int_constant, str_constant))), RuleAtom::Constant)(i)
 }
 
-fn construct(i: &str) -> IResult<&str, RuleAtom> {
+pub fn construct(i: &str) -> IResult<&str, RuleAtom> {
     let pair = pair(domain_id, list(rule_atom));
     nommap(pair, |(did, args)| RuleAtom::Construct { did, args })(i)
 }
 
-fn rule_atom(i: &str) -> IResult<&str, RuleAtom> {
+pub fn rule_atom(i: &str) -> IResult<&str, RuleAtom> {
     alt((variable, constant, construct))(i)
 }
 
-fn rule_literal(i: &str) -> IResult<&str, RuleLiteral> {
+pub fn rule_literal(i: &str) -> IResult<&str, RuleLiteral> {
     let (i, (excl, ra)) = pair(opt(ws(tag("!"))), rule_atom)(i)?;
     let sign = if excl.is_some() { Sign::Neg } else { Sign::Pos };
     Ok((i, RuleLiteral { sign, ra }))

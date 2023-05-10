@@ -1,46 +1,49 @@
 use crate::{
     ast::*,
-    statics::{RuleVariableTypes, VariableTypes},
+    statics::{Checked, VariableTypes},
 };
 use core::fmt::Debug;
 use std::collections::{HashMap, HashSet};
 
 /// Concrete counterpart to `RuleAtom` with no domain info
 #[derive(Ord, PartialOrd, Hash, Eq, PartialEq, Clone)]
-enum Atom {
+pub enum Atom {
     Constant { c: Constant },
     Construct { did: DomainId, args: Vec<Atom> },
 }
 
+/// A store of atoms, grouped by domain for ease of lookup.
 #[derive(Default, PartialEq, Eq)]
 pub struct Knowledge {
-    map: HashMap<DomainId, HashSet<Atom>>,
+    pub map: HashMap<DomainId, HashSet<Atom>>,
 }
 
+/// Three instances of `Knowledge`, denoting truths, unknowns, and emissions.
+/// Invariants:
+/// 1. truths and unknowns are disjoint.
+/// 2. emissions are a subset of truths.
 #[derive(Debug)]
 pub struct Denotation {
-    pub trues: Knowledge,
+    pub truths: Knowledge,
     pub unknowns: Knowledge,
     pub emissions: Knowledge,
 }
 
+/// Used internally when concretizing a rule. Conceptually, is a map from VariableId to Atom.
+/// Here, implemented with a vector so that the state of its mappings can be easily saved and reverted.
 #[derive(Debug, Default)]
-struct VariableAssignments {
+pub struct VariableAssignments {
     assignments: Vec<(VariableId, Atom)>,
 }
+
+/// Encodes a snapshot of a growing `VariableAssignments` structure. Used to revert prior states.
 struct StateToken {
     assignments_count: usize,
 }
 
-pub struct NoPretty<T: Debug>(pub T);
-impl<T: Debug> Debug for NoPretty<T> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?}", &self.0)
-    }
-}
-
+/// Represent an immutable `Knowledge` value whose contents can be logically negated.
 #[derive(Debug, Copy, Clone)]
-enum ComplementKnowledge<'a> {
+pub enum ComplementKnowledge<'a> {
     Empty,
     ComplementOf(&'a Knowledge),
 }
@@ -84,7 +87,7 @@ impl std::fmt::Debug for Knowledge {
                     None
                 } else {
                     Some({
-                        let mut vec = set.iter().map(NoPretty).collect::<Vec<_>>();
+                        let mut vec = set.iter().map(crate::util::NoPretty).collect::<Vec<_>>();
                         vec.sort_by_key(|t| t.0);
                         (did, vec)
                     })
@@ -133,21 +136,19 @@ impl VariableAssignments {
     }
 }
 
-impl Program {
-    fn big_step_inference(
+impl Checked<'_> {
+    pub fn big_step_inference(
         &self,
-        rvt: &RuleVariableTypes,
         neg: ComplementKnowledge,
         pos_w: &mut Knowledge,
         va: &mut VariableAssignments,
     ) -> Knowledge {
-        assert!(pos_w.map.is_empty());
         let mut pos_r = Knowledge::default();
         loop {
-            for (sidx, statement) in self.statements.iter().enumerate() {
+            for (sidx, statement) in self.program.statements.iter().enumerate() {
                 if let Statement::Rule(rule) = statement {
                     // println!("rule at index {} ...", sidx);
-                    let v2d = rvt.get(&sidx).expect("wah");
+                    let v2d = self.rvt.get(&sidx).expect("wah");
                     rule.inference_stage(v2d, neg, &pos_r, pos_w, va);
                 }
             }
@@ -160,25 +161,26 @@ impl Program {
         }
     }
 
-    pub fn denotation(&self, rvt: &RuleVariableTypes) -> Denotation {
+    /// Computes and returns the denotation of the given checked program.
+    pub fn denotation(&self) -> Denotation {
         let mut pos_w = Knowledge::default();
         let mut va = VariableAssignments::default();
         let mut interpretations =
-            vec![self.big_step_inference(rvt, ComplementKnowledge::Empty, &mut pos_w, &mut va)];
+            vec![self.big_step_inference(ComplementKnowledge::Empty, &mut pos_w, &mut va)];
         loop {
             // println!("\n>>>>>> INTERPRTATIONS: {:?}", &interpretations);
             if interpretations.len() % 2 == 1 {
                 if let [.., a, b, c, d] = interpretations.as_mut_slice() {
                     if a == c && b == d {
                         use std::mem::take;
-                        let trues = take(d);
+                        let truths = take(d);
                         let mut unknowns = take(c);
                         for (did, set) in unknowns.map.iter_mut() {
-                            set.retain(|atom| !trues.contains(did, atom))
+                            set.retain(|atom| !truths.contains(did, atom))
                         }
-                        let emitted_dids = self.emitted_domains();
+                        let emitted_dids = self.program.emitted_domains();
                         let emissions = Knowledge {
-                            map: trues
+                            map: truths
                                 .map
                                 .iter()
                                 .filter_map(|(did, set)| {
@@ -190,28 +192,30 @@ impl Program {
                                 })
                                 .collect(),
                         };
-                        return Denotation { trues, unknowns, emissions };
+                        return Denotation { truths, unknowns, emissions };
                     }
                 }
             }
             let neg = ComplementKnowledge::ComplementOf(interpretations.iter().last().unwrap());
-            let pos = self.big_step_inference(rvt, neg, &mut pos_w, &mut va);
+            assert!(pos_w.map.is_empty());
+            assert!(va.assignments.is_empty());
+            let pos = self.big_step_inference(neg, &mut pos_w, &mut va);
             interpretations.push(pos);
         }
     }
 }
 
 impl Knowledge {
-    fn atoms_in_domain(&self, did: &DomainId) -> impl Iterator<Item = &Atom> + '_ {
+    pub fn atoms_in_domain(&self, did: &DomainId) -> impl Iterator<Item = &Atom> + '_ {
         self.map.get(did).into_iter().flat_map(|set| set.iter())
     }
-    fn contains(&self, did: &DomainId, atom: &Atom) -> bool {
+    pub fn contains(&self, did: &DomainId, atom: &Atom) -> bool {
         self.map.get(did).map(|set| set.contains(atom)).unwrap_or(false)
     }
-    fn insert(&mut self, did: &DomainId, atom: Atom) -> bool {
+    pub fn insert(&mut self, did: &DomainId, atom: Atom) -> bool {
         self.map.entry(did.clone()).or_default().insert(atom)
     }
-    fn absorb_all(&mut self, other: &mut Self) -> bool {
+    pub fn absorb_all(&mut self, other: &mut Self) -> bool {
         let mut changed = false;
         for (did, set) in other.map.drain() {
             for atom in set {

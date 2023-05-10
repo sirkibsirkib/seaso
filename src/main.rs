@@ -3,6 +3,7 @@ mod dynamics;
 mod parse;
 mod preprocessing;
 mod statics;
+mod util;
 
 use std::time::{Duration, Instant};
 
@@ -31,8 +32,8 @@ fn main() -> Result<(), ()> {
         preprocessing::deanonymize_variable_ids(program);
         let check_result = program.check();
         let start_i2 = Instant::now();
-        if let Ok(r2v2d) = &check_result {
-            let denotation = program.denotation(&r2v2d);
+        if let Ok(checked) = &check_result {
+            let denotation = checked.denotation();
             let start_i3 = Instant::now();
             println!(
                 "{:#?}",

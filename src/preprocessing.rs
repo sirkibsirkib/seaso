@@ -10,6 +10,7 @@ trait DeanonymizeVids {
 
 ////////////////
 
+/// Strips substrings that follow '#' but precede '\n' or the end of the string.
 pub fn remove_line_comments(s: &mut String) {
     let mut outside_comment = true;
     s.retain(|c| {
@@ -22,6 +23,8 @@ pub fn remove_line_comments(s: &mut String) {
     })
 }
 
+/// Replaces each occurrence of `VariableId("_")` with a new identifier.
+/// Assumes that no variables already in the program have prefix "v", which is the case for all parsed programs.
 pub fn deanonymize_variable_ids(program: &mut Program) {
     // let mut ava = AnonVariableAllocator { next: 0 };
     program.deanonymize_vids(&mut AnonVariableAllocator { next: 0 })
