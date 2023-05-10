@@ -7,7 +7,7 @@ This contains the source code of the Seaso executor, which can be compiled to a 
 You will need:
 1. `rustc`: the Rust language compiler `rustc` (https://www.rust-lang.org/). I am using `rustc` version 1.69, but many older versions will do fine. (If it complies, all is well).
 2. `cargo`: the Rust package manager.
-Both of these can be conveniently installed using `rustup`, the Rust package manager (https://rustup.rs/).
+Both of these can be conveniently installed using `rustup`, the Rust installer and toolchain manager (https://rustup.rs/).
 
 ### Compilation
 To acquire and compile from source:
