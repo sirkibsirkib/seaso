@@ -16,14 +16,14 @@ To acquire and compile from source:
 The compiled binary ('the Seaso executor') will be found at `./target/release/seaso` (or `.\target\release\seaso.exe` on Windows).
 
 ### Usage
-Run the Seaso executor, feeding in your source code as standard input. For example, run `./target/release/seaso.exe < ./program_examples/toy1.seaso`.
+Run the Seaso executor, feeding in your source code as standard input. For example, run `./target/release/seaso.exe < ./program_examples/trust.seaso`.
 
 ### Output
 
 Once the Seaso executor has consumed all standard input, it will parse and check if your Seaso program is well-formed, and if, so, will compute and output its denotation.
 The denotation consists of three sets of atoms: _truths_, _unknowns_, and _emissions_.
 Always, truths and unknowns are disjoint, and truths are a superset of emissions.
-Here is an example output resulting from `./target/release/seaso.exe < ./program_examples/trust.seaso`
+Here is an example output resulting from the above usage.
 
 ```
 TimesTaken {
@@ -74,7 +74,6 @@ parse error None
 
 ## Source and library
 
-This section is for those interested in scrutinizing or using the source code itself.
 Source code documentation can be generated with `cargo doc --no-deps`, producing HTML documentation in `target\doc`.
 For extra convenience, run with `cargo doc --no-deps --open`.
 The repo can be used as a rust dependency as usual (see `crates.io` for some examples).
