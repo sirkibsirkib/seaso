@@ -1,9 +1,6 @@
-defn known(). unknown1(). unknown2().
+rule 1 :- !2, 3.
+     2 :- !1.
+     3.
 
-# these rules alone result in two unknowns (as per the names)
-rule unknown1() :- !unknown2(), known().
-     unknown2() :- !unknown1().
-     known().
-
-# ... but this fixes it. "unknown2" is true, hence "unknown1" is false.
-rule unknown2().
+# {1,2} are unknown until this fixes it. 2 is true so 1 is false.
+rule 2.

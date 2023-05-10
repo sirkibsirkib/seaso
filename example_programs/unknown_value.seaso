@@ -1,4 +1,3 @@
-defn unknown1(). unknown2(). known(). 
-rule unknown1() :- !unknown2(), known().
-     unknown2() :- !unknown1().
-     known().
+rule 1 :- !2, 3.
+     2 :- !1.
+     3.
