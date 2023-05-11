@@ -1,0 +1,7 @@
+defn lt(int,int). eq(int,int). pair(int,int). pairLt(pair,pair).
+rule eq(A,A) :- A.
+rule A,B :- lt(A,B).
+     lt(A,B) :- lt(A,C), lt(C,B).
+     lt(0,1). lt(1,2). lt(2,3). lt(3,4).
+     pairLt(pair(A,B),pair(C,D)) :- B, D, lt(A,C).
+     pairLt(pair(A,B),pair(A,C)) :- A, lt(B,C).

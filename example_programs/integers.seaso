@@ -1,0 +1,30 @@
+defn even(int). pos(int).
+defn next(int,int). eq(int,int). lt(int,int). neg(int,int).
+defn sum(int,int,int). sub(int,int,int). mul(int,int,int).
+     div(int,int,int). mod(int,int,int). exp(int,int,int).
+rule A,B :- next(A,B).
+rule eq(A,A) :- A.
+rule pos(A) :- lt(-1,A).
+rule lt(A,B) :- next(A,B).
+     lt(A,B) :- lt(A,C), lt(C,B).
+rule next(-6,-5). next(-5,-4).
+     next(-4,-3). next(-3,-2).
+     next(-2,-1). next(-1,0).
+     next(0,1). next(1,2).
+     next(2,3). next(3,4).
+     next(4,5). next(5,6).
+     next(6,7). next(7,8).
+rule sum(0,A,A) :- A.
+     sum(A,B,C) :- sum(B,A,C).
+     sum(A,B,C) :- sum(D,B,E), next(A,D), next(C,E).
+     sum(A,B,C) :- sum(D,B,E), next(D,A), next(E,C).
+rule sub(A,B,C) :- sum(C,B,A).
+rule mul(A,0,0) :- A.
+     mul(A,B,C) :- mul(A,D,E), next(D,B), sum(E,A,C).
+rule div(A,B,C) :- mul(C,B,A), !eq(B,0).
+rule neg(A,B) :- sub(0,A,B).
+rule mod(A,B,A) :- pos(B), lt(A,B).
+rule mod(A,B,C) :- pos(B), !lt(A,B), sub(A,B,C).
+rule exp(A,0,1) :- A.
+     exp(A,B,C) :- exp(A,D,E), next(D,B), mul(E,A,C).
+rule even(A) :- div(A,2,B).

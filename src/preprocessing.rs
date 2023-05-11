@@ -33,10 +33,12 @@ pub fn deanonymize_variable_ids(program: &mut Program) {
 impl DeanonymizeVids for Program {
     fn deanonymize_vids(&mut self, ava: &mut AnonVariableAllocator) {
         for statement in &mut self.statements {
-            if let Statement::Rule(Rule { consequents, antecedents }) = statement {
-                for ra in consequents.iter_mut().chain(antecedents.iter_mut().map(|rl| &mut rl.ra))
-                {
-                    ra.deanonymize_vids(ava)
+            if let Statement::Rule(Rule { antecedents, .. }) = statement {
+                // Only deanonymize ENUMERABLE variables!
+                for antecedent in antecedents {
+                    if antecedent.sign == Sign::Pos {
+                        antecedent.ra.deanonymize_vids(ava)
+                    }
                 }
             }
         }
