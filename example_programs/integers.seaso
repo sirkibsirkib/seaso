@@ -1,7 +1,7 @@
-defn even(int). pos(int).
-defn next(int,int). eq(int,int). lt(int,int). neg(int,int).
-defn sum(int,int,int). sub(int,int,int). mul(int,int,int).
-     div(int,int,int). mod(int,int,int). exp(int,int,int).
+defn even(int). pos(int). next(int,int). eq(int,int).
+     lt(int,int). neg(int,int). sum(int,int,int).
+     sub(int,int,int). mul(int,int,int). div(int,int,int).
+     mod(int,int,int). exp(int,int,int).
 rule A,B :- next(A,B).
 rule eq(A,A) :- A.
 rule pos(A) :- lt(-1,A).
