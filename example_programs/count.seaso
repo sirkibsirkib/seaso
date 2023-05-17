@@ -1,0 +1,40 @@
+# integer total order
+defn succ(int,int). less(int,int).
+     not_min(int). min(int).
+     not_max(int). max(int).
+rule A,B :- succ(A,B).
+     less(A,B) :- succ(A,B).
+     less(A,C) :- less(A,B), less(B,C).
+     not_min(B) :- less(A,B).
+     not_max(A) :- less(A,B).
+     min(A) :- A, !not_min(A).
+     max(A) :- A, !not_max(A).
+seal less. not_min. min. not_max. max.
+
+# things we are counting
+defn x(int).
+
+# counting
+defn leq_x_count(x,int). x_count(int).
+    # base cases
+rule leq_x_count(x(A),A) :- min(A), !x(A).
+     leq_x_count(x(A),B) :- min(A), succ(A,B), x(A).
+    # inductive steps
+rule leq_x_count(x(B),X) :- succ(A,B), leq_x_count(x(A),X), !x(B).
+     leq_x_count(x(B),Y) :- succ(A,B), leq_x_count(x(A),X), succ(X,Y), x(B).
+    # result
+rule x_count(X) :- leq_x_count(x(A),X), max(A).
+seal leq_x_count. x_count.
+
+# pseudo ill-formedities:
+defn cyclic(int). id(int,int). disconnected(int,int).
+rule cyclic(A) :- less(A,A).
+     id(A,A) :- A.
+     A :- x(A).
+     disconnected(A,B) :- A, B, !id(A,B), !less(A,B), !less(B,A).
+emit cyclic. disconnected.
+seal cyclic. disconnected.
+
+# user input: ...
+rule succ(0,1). succ(1,2). succ(2,3). succ(3,4). succ(4,20).
+rule x(0). x(2). x(20).
