@@ -6,14 +6,14 @@ rule transfer(agent("Alice"), data("Test Data"), agent("Bob")).
 seal transfer.
 
 decl computation.
-defn with(computation,data).
+defn involved(computation,data).
 defn input(computation,data).
      output(computation,data).
      function(computation,data).
      parameter(computation,int,data).
-rule C, D :- with(C,D).
-     with(C,D) :- input(C,D).
-     with(C,D) :- output(C,D).
+rule C, D :- involved(C,D).
+     involved(C,D) :- input(C,D).
+     involved(C,D) :- output(C,D).
      input(C,D) :- function(C,D).
      input(C,D) :- parameter(C,I,D).
 
