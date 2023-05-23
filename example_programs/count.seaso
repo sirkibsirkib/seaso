@@ -2,6 +2,7 @@
 defn succ(int,int). less(int,int).
      not_min(int). min(int).
      not_max(int). max(int).
+     succ(0,1).
 rule A,B :- succ(A,B).
      less(A,B) :- succ(A,B).
      less(A,C) :- less(A,B), less(B,C).
@@ -17,8 +18,8 @@ defn x(int).
 # counting
 defn leq_x_count(x,int). x_count(int).
     # base cases
-rule leq_x_count(x(A),A) :- min(A), !x(A).
-     leq_x_count(x(A),B) :- min(A), succ(A,B), x(A).
+rule leq_x_count(x(A),0) :- !x(A).
+     leq_x_count(x(A),1) :- x(A).
     # inductive steps
 rule leq_x_count(x(B),X) :- succ(A,B), leq_x_count(x(A),X), !x(B).
      leq_x_count(x(B),Y) :- succ(A,B), leq_x_count(x(A),X), succ(X,Y), x(B).

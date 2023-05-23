@@ -15,7 +15,7 @@ pub struct DomainId(pub String);
 #[derive(Clone, PartialEq, Hash, Eq)]
 pub struct VariableId(pub String);
 
-#[derive(Ord, PartialOrd, Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Ord, PartialOrd, Clone, Hash, PartialEq, Eq)]
 pub enum Constant {
     Int(i64),
     Str(String),
@@ -23,7 +23,7 @@ pub enum Constant {
 
 /// "Abstract values" as they may contain variables.
 /// See `Atom` (defined in `dynamics.rs`) for the concretized version.
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+#[derive(Clone, PartialEq, Hash, Eq)]
 pub enum RuleAtom {
     Variable(VariableId),
     Constant(Constant),
@@ -60,13 +60,33 @@ pub enum Sign {
 }
 
 /// A signed atom. These occur as antecedents of rules.
-#[derive(Debug)]
 pub struct RuleLiteral {
     pub sign: Sign,
     pub ra: RuleAtom,
 }
 
 /////////////
+
+impl Debug for RuleAtom {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        use crate::util::CommaSep;
+        match self {
+            Self::Variable(vid) => vid.fmt(f),
+            Self::Constant(c) => c.fmt(f),
+            Self::Construct { did, args } => {
+                write!(f, "{:?}({:?})", did, CommaSep { iter: args, spaced: false })
+            }
+        }
+    }
+}
+impl Debug for RuleLiteral {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        if self.sign == Sign::Neg {
+            write!(f, "!")?
+        }
+        self.ra.fmt(f)
+    }
+}
 
 impl Debug for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
@@ -95,6 +115,14 @@ impl Debug for DomainId {
     }
 }
 
+impl Debug for Constant {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Self::Int(c) => c.fmt(f),
+            Self::Str(c) => c.fmt(f),
+        }
+    }
+}
 impl Debug for VariableId {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{}", &self.0)

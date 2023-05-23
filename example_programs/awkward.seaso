@@ -1,0 +1,5 @@
+# formalize: nonempty iff. there are no items
+decl item.
+defn nonEmpty(). item2(item).
+rule item2(I) :- I.
+     nonEmpty() :- item2(I).

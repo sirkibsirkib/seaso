@@ -1,5 +1,5 @@
-defn suc(int,int).     sum(int,int,int).
-     sub(int,int,int). mul(int,int,int).
+defn suc(int,int). sum(int,int,int). 
+ mul(int,int,int). sub(int,int,int).
 rule    A,B :- suc(A,B).
  sum(0,A,A) :- A.
  sum(A,B,C) :- sum(B,A,C).
@@ -8,4 +8,3 @@ rule    A,B :- suc(A,B).
  mul(A,0,0) :- A.
  mul(A,B,C) :- mul(A,D,E), suc(D,B), sum(E,A,C).
 seal sum. sub. mul.
-rule suc(0,1). suc(1,2). suc(2,3). suc(3,4).
