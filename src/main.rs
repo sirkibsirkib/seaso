@@ -51,5 +51,8 @@ fn main() -> Result<(), ()> {
         println!("check error {:#?}", check_result.err());
     }
     println!("parse error {:?}", parse_result.err());
+
+    let domains = vec![DomainId("guy".into(), "none".into())];
+    let user_query = UserQuery(domains);
     Ok(())
 }

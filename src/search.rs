@@ -1,13 +1,10 @@
-use crate::dynamics::ComplementKnowledge;
-use crate::dynamics::Denotes;
-use crate::dynamics::Knowledge;
-use crate::dynamics::TakesBigSteps;
-use crate::dynamics::VariableAssignments;
-use crate::statics::HasEmittedDomains;
 use crate::{
-    ast::{DomainId, Program, Rule, RuleAtom, Statement},
-    dynamics::{Atom, Denotation},
-    statics::Checked,
+    ast::{DomainId, RuleAtom},
+    dynamics::{
+        Atom, ComplementKnowledge, Denotation, Denotes, Knowledge, TakesBigSteps,
+        VariableAssignments,
+    },
+    statics::{Checked, HasEmittedDomains},
 };
 use std::collections::HashSet;
 
@@ -17,10 +14,7 @@ pub struct Badness {
     count: usize,
 }
 
-struct UnaryDefn {
-    did: DomainId,
-    param: DomainId,
-}
+#[derive(Clone)]
 pub struct UnaryFact {
     pub did: DomainId,
     pub arg: Atom,
@@ -51,23 +45,6 @@ impl Into<RuleAtom> for Atom {
                 RuleAtom::Construct { did, args: args.into_iter().map(Into::into).collect() }
             }
         }
-    }
-}
-
-impl Program {
-    fn compose(&self, facts: &[UnaryFact]) -> Self {
-        let mut program = self.clone();
-        for UnaryFact { did, arg } in facts {
-            let s = Statement::Rule(Rule {
-                consequents: vec![RuleAtom::Construct {
-                    did: did.clone(),
-                    args: vec![arg.clone().into()],
-                }],
-                antecedents: vec![],
-            });
-            program.statements.push(s);
-        }
-        program
     }
 }
 
@@ -113,11 +90,29 @@ pub struct Best {
 impl Checked<'_> {
     fn search_rec(&self, inner_query: &InnerQuery, stack: &mut Vec<UnaryFact>, best: &mut Best) {
         let denotation = ProgramWithFacts { checked: self, facts: stack }.denotation();
+        let badness = denotation.badness(inner_query.user_query);
+        match [&badness, &best.badness] {
+            [_, None] => return,
+            [None, Some(_)] => {
+                best.badness = None;
+                best.facts = stack.clone();
+                return;
+            }
+            [Some(x), Some(y)] => {
+                if x < y {
+                    best.badness = badness;
+                    best.facts = stack.clone();
+                }
+            }
+        }
         let facts = denotation.all_addable_facts(inner_query);
         for fact in facts {
             stack.push(fact);
             self.search_rec(inner_query, stack, best);
             stack.pop();
+            if best.badness.is_none() {
+                return;
+            }
         }
     }
 }
