@@ -34,6 +34,7 @@ fn main() -> Result<(), ()> {
         let check_result = program.check();
         let start_i2 = Instant::now();
         if let Ok(checked) = &check_result {
+            use dynamics::Denotes as _;
             let denotation = checked.denotation();
             let start_i3 = Instant::now();
             println!(
@@ -45,6 +46,12 @@ fn main() -> Result<(), ()> {
                 }
             );
             println!("{:#?}", &denotation);
+
+            use ast::DomainId;
+            use search::UserQuery;
+            let domains = vec![DomainId("guy".into()), DomainId("none".into())];
+            let user_query = UserQuery(&domains);
+            println!("search {:#?}", checked.search(user_query));
         }
         println!("undeclared domains: {:?}", program.undeclared_domains());
         println!("seal broken: {:?}", program.seal_break());
@@ -52,7 +59,5 @@ fn main() -> Result<(), ()> {
     }
     println!("parse error {:?}", parse_result.err());
 
-    let domains = vec![DomainId("guy".into(), "none".into())];
-    let user_query = UserQuery(domains);
     Ok(())
 }

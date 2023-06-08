@@ -83,6 +83,15 @@ impl HasEmittedDomains for Program {
     }
 }
 impl Program {
+    pub fn sealed_domains(&self) -> HashSet<&DomainId> {
+        self.statements
+            .iter()
+            .filter_map(|statement| match statement {
+                Statement::Seal(did) => Some(did),
+                _ => None,
+            })
+            .collect()
+    }
     /// Check all well-formedness criteria of this program depended on
     /// by `denotation`. Returns the assignment of a unique `DomainId`
     /// per variable per rule. `(Program,RuleVariableTypes)` can be

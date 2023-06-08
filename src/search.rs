@@ -21,16 +21,24 @@ pub struct UnaryFact {
 }
 
 #[derive(Clone, Copy)]
-pub struct UserQuery<'a>(&'a [DomainId]);
+pub struct UserQuery<'a>(pub &'a [DomainId]);
 struct InnerQuery<'a> {
     user_query: UserQuery<'a>,
     enum_construct_param: Vec<(DomainId, DomainId)>,
+}
+
+#[derive(Debug)]
+pub struct Best {
+    facts: Vec<UnaryFact>,
+    badness: Option<Badness>,
 }
 
 struct ProgramWithFacts<'a> {
     checked: &'a Checked<'a>,
     facts: &'a [UnaryFact],
 }
+
+//////////////////////////
 
 impl HasEmittedDomains for ProgramWithFacts<'_> {
     fn emitted_domains(&self) -> HashSet<&DomainId> {
@@ -80,11 +88,6 @@ impl Denotation {
                 })
         })
     }
-}
-
-pub struct Best {
-    facts: Vec<UnaryFact>,
-    badness: Option<Badness>,
 }
 
 impl Checked<'_> {
@@ -140,10 +143,14 @@ impl Checked<'_> {
         best
     }
     fn innerize_query<'a, 'b>(&'a self, user_query: UserQuery<'b>) -> InnerQuery<'b> {
+        let sealed_domains = self.program.sealed_domains();
         let enum_construct_param = user_query
             .0
             .iter()
             .filter_map(|did| {
+                if sealed_domains.contains(did) {
+                    return None;
+                }
                 if let Some((_statement_idx, params)) = self.dd.get(did) {
                     if let [param] = params.as_slice() {
                         Some((did.clone(), param.clone()))
@@ -156,5 +163,11 @@ impl Checked<'_> {
             })
             .collect();
         InnerQuery { user_query, enum_construct_param }
+    }
+}
+
+impl std::fmt::Debug for UnaryFact {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}({:?})", self.did, self.arg)
     }
 }
