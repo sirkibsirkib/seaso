@@ -3,11 +3,13 @@ use crate::dynamics::Denotes;
 use crate::dynamics::Knowledge;
 use crate::dynamics::TakesBigSteps;
 use crate::dynamics::VariableAssignments;
+use crate::statics::HasEmittedDomains;
 use crate::{
     ast::{DomainId, Program, Rule, RuleAtom, Statement},
     dynamics::{Atom, Denotation},
     statics::Checked,
 };
+use std::collections::HashSet;
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Badness {
@@ -36,6 +38,11 @@ struct ProgramWithFacts<'a> {
     facts: &'a [UnaryFact],
 }
 
+impl HasEmittedDomains for ProgramWithFacts<'_> {
+    fn emitted_domains(&self) -> HashSet<&DomainId> {
+        self.checked.emitted_domains()
+    }
+}
 impl Into<RuleAtom> for Atom {
     fn into(self) -> RuleAtom {
         match self {
@@ -98,15 +105,20 @@ impl Denotation {
     }
 }
 
-struct Best {
+pub struct Best {
     facts: Vec<UnaryFact>,
     badness: Option<Badness>,
 }
 
 impl Checked<'_> {
-    fn search_rec(&self, stack: &mut Vec<UnaryFact>, best: &mut Best) {
-        // let iter =
-        todo!()
+    fn search_rec(&self, inner_query: &InnerQuery, stack: &mut Vec<UnaryFact>, best: &mut Best) {
+        let denotation = ProgramWithFacts { checked: self, facts: stack }.denotation();
+        let facts = denotation.all_addable_facts(inner_query);
+        for fact in facts {
+            stack.push(fact);
+            self.search_rec(inner_query, stack, best);
+            stack.pop();
+        }
     }
 }
 
@@ -129,7 +141,7 @@ impl Checked<'_> {
         let inner_query = self.innerize_query(user_query);
         let mut best = Best { facts: vec![], badness: self.denotation().badness(user_query) };
         let mut stack = vec![];
-        self.search_rec(&mut stack, &mut best);
+        self.search_rec(&inner_query, &mut stack, &mut best);
         best
     }
     fn innerize_query<'a, 'b>(&'a self, user_query: UserQuery<'b>) -> InnerQuery<'b> {
