@@ -31,12 +31,13 @@ pub enum RuleAtom {
 }
 
 /// A sequence of statements.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
 
 /// One of five kinds of statement.
+#[derive(Clone)]
 pub enum Statement {
     Decl(DomainId),
     Defn { did: DomainId, params: Vec<DomainId> },
@@ -46,7 +47,7 @@ pub enum Statement {
 }
 
 /// A logical implication rule with N conjunctive consequents and N conjunctive antecedents.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Rule {
     pub consequents: Vec<RuleAtom>,
     pub antecedents: Vec<RuleLiteral>,
@@ -60,6 +61,7 @@ pub enum Sign {
 }
 
 /// A signed atom. These occur as antecedents of rules.
+#[derive(Clone)]
 pub struct RuleLiteral {
     pub sign: Sign,
     pub ra: RuleAtom,

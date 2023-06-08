@@ -2,6 +2,7 @@ mod ast;
 mod dynamics;
 mod parse;
 mod preprocessing;
+mod search;
 mod statics;
 mod util;
 

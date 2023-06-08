@@ -1,3 +1,4 @@
+use crate::statics::HasEmittedDomains;
 use crate::{
     ast::*,
     statics::{Checked, VariableTypes},
@@ -46,6 +47,18 @@ struct StateToken {
 pub enum ComplementKnowledge<'a> {
     Empty,
     ComplementOf(&'a Knowledge),
+}
+
+pub trait TakesBigSteps {
+    fn big_step_inference(
+        &self,
+        neg: ComplementKnowledge,
+        pos_w: &mut Knowledge,
+        va: &mut VariableAssignments,
+    ) -> Knowledge;
+}
+pub trait Denotes {
+    fn denotation(&self) -> Denotation;
 }
 
 //////////////////////////////////////////////////////
@@ -136,8 +149,8 @@ impl VariableAssignments {
     }
 }
 
-impl Checked<'_> {
-    pub fn big_step_inference(
+impl TakesBigSteps for Checked<'_> {
+    fn big_step_inference(
         &self,
         neg: ComplementKnowledge,
         pos_w: &mut Knowledge,
@@ -160,9 +173,20 @@ impl Checked<'_> {
             }
         }
     }
+}
 
+impl HasEmittedDomains for Checked<'_> {
+    fn emitted_domains(&self) -> HashSet<&DomainId> {
+        self.program.emitted_domains()
+    }
+}
+
+impl<T> Denotes for T
+where
+    T: TakesBigSteps + HasEmittedDomains,
+{
     /// Computes and returns the denotation of the given checked program.
-    pub fn denotation(&self) -> Denotation {
+    fn denotation(&self) -> Denotation {
         let mut pos_w = Knowledge::default();
         let mut va = VariableAssignments::default();
         let mut interpretations =
@@ -178,7 +202,7 @@ impl Checked<'_> {
                         for (did, set) in unknowns.map.iter_mut() {
                             set.retain(|atom| !truths.contains(did, atom))
                         }
-                        let emitted_dids = self.program.emitted_domains();
+                        let emitted_dids = self.emitted_domains();
                         let emissions = Knowledge {
                             map: truths
                                 .map

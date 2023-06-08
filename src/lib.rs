@@ -13,4 +13,6 @@ pub mod statics;
 /// Dynamics of Seaso, implementing methods and defining types needed to compute the denotation of a checked program.`
 pub mod dynamics;
 
+pub mod search;
+
 mod util;

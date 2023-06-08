@@ -3,7 +3,7 @@ use crate::ast::*;
 use std::collections::{HashMap, HashSet};
 
 /// Used (internally) to remember where and how constructors are defined.
-type DomainDefinitions = HashMap<DomainId, (StatementIdx, Vec<DomainId>)>;
+pub type DomainDefinitions = HashMap<DomainId, (StatementIdx, Vec<DomainId>)>;
 
 /// These annotate programs to create the internal representation.
 /// Ultimately, they prescribe exactly one type to each variable in each rule.
@@ -45,8 +45,15 @@ pub struct SealBreak {
 #[derive(Debug)]
 pub struct Checked<'a> {
     pub(crate) program: &'a Program,
+    pub(crate) dd: DomainDefinitions,
     pub(crate) rvt: RuleVariableTypes,
 }
+
+pub trait HasEmittedDomains {
+    fn emitted_domains(&self) -> HashSet<&DomainId>;
+}
+
+//////////////////
 
 impl DomainId {
     pub const PRIMITIVE_STRS: [&str; 2] = ["str", "int"];
@@ -63,9 +70,9 @@ impl AsRef<RuleVariableTypes> for Checked<'_> {
     }
 }
 
-impl Program {
+impl HasEmittedDomains for Program {
     /// Used to filter the truths of the denotation.
-    pub fn emitted_domains(&self) -> HashSet<&DomainId> {
+    fn emitted_domains(&self) -> HashSet<&DomainId> {
         self.statements
             .iter()
             .filter_map(|statement| match statement {
@@ -74,7 +81,8 @@ impl Program {
             })
             .collect()
     }
-
+}
+impl Program {
     /// Check all well-formedness criteria of this program depended on
     /// by `denotation`. Returns the assignment of a unique `DomainId`
     /// per variable per rule. `(Program,RuleVariableTypes)` can be
@@ -96,7 +104,7 @@ impl Program {
                 })
             })
             .collect::<Result<_, _>>()
-            .map(|rvt| Checked { program: self, rvt })
+            .map(|rvt| Checked { program: self, dd, rvt })
     }
 
     /// Returns all domains used but not declared, which is trivially
