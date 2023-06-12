@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-nom = "7.1.3" # parser combinators used in ./parse.rs
+nom = "7.1.3"       # parser combinators used in ./parse.rs
+smallvec = "1.10.0" # more space-efficient vector for small lengths used in ./ir.rs 
 
 # [lib]
 # name = "seaso_lib"
