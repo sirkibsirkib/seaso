@@ -1,6 +1,5 @@
 mod ast;
 mod dynamics;
-mod ir;
 mod parse;
 mod preprocessing;
 mod search;

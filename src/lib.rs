@@ -1,8 +1,6 @@
 /// Defines the abstract syntax of Seaso programs.
 pub mod ast;
 
-pub mod ir;
-
 /// Methods for preprocessing programs at source level (removing line comments) and abstract syntax level (Allocating fresh names for each VariableId("_")).
 pub mod preprocessing;
 

@@ -1,0 +1,14 @@
+decl module. domain.
+defn with(module,module). seals(module,domain).
+     modifies(module,domain). breaks(module,module).
+     relevant(module).
+rule M1,M2 :- with(M1,M2).
+     Ms,Mm :- breaks(Ms,Mm).
+     M,D :- seals(M,D).
+     M,D :- modifies(M,D).
+     with(X,Z) :- with(X,Y), with(Y,Z).
+     relevant(M2) :- with(M1,M2), relevant(M1).
+     breaks(Ms,D) :- seals(Ms,D), modifies(Mm,D),
+       !with(Ms,Mm), relevant(Ms).
+emit breaks. seal breaks.
+     
