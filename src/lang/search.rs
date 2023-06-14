@@ -1,12 +1,7 @@
 use crate::{
-    ast::{DomainId, RuleAtom},
-    dynamics::{
-        Atom, ComplementKnowledge, Denotation, Denotes, Knowledge, TakesBigSteps,
-        VariableAssignments,
-    },
-    statics::{Checked, HasEmittedDomains},
+    dynamics::{Atom, Denotation, Executable},
+    DomainId, ExecutableProgram, RuleAtom,
 };
-use std::collections::HashSet;
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Badness {
@@ -14,16 +9,15 @@ pub struct Badness {
     count: usize,
 }
 
-#[derive(Clone)]
-pub struct UnaryFact {
-    pub did: DomainId,
-    pub arg: Atom,
-}
+type UnaryFact = Atom; // Construct with one param, contains no variables
 
 #[derive(Clone, Copy)]
-pub struct UserQuery<'a>(pub &'a [DomainId]);
+
+/// ascending order of badness
+pub struct DomainBadnessOrder<'a>(pub &'a [DomainId]);
+
 struct InnerQuery<'a> {
-    user_query: UserQuery<'a>,
+    user_query: DomainBadnessOrder<'a>,
     enum_construct_param: Vec<(DomainId, DomainId)>,
 }
 
@@ -33,18 +27,8 @@ pub struct Best {
     badness: Option<Badness>,
 }
 
-struct ProgramWithFacts<'a> {
-    checked: &'a Checked<'a>,
-    facts: &'a [UnaryFact],
-}
-
 //////////////////////////
 
-impl HasEmittedDomains for ProgramWithFacts<'_> {
-    fn emitted_domains(&self) -> HashSet<&DomainId> {
-        self.checked.emitted_domains()
-    }
-}
 impl Into<RuleAtom> for Atom {
     fn into(self) -> RuleAtom {
         match self {
@@ -57,7 +41,7 @@ impl Into<RuleAtom> for Atom {
 }
 
 impl Denotation {
-    fn badness(&self, user_query: UserQuery) -> Option<Badness> {
+    fn badness(&self, user_query: DomainBadnessOrder) -> Option<Badness> {
         for (rank, bad_domain) in user_query.0.iter().enumerate() {
             let map = self.truths.map.get(bad_domain);
             let count = match map {
@@ -78,21 +62,15 @@ impl Denotation {
         inner_query.enum_construct_param.iter().flat_map(|(did, param)| {
             self.truths
                 .atoms_in_domain(param)
-                .map(|arg| UnaryFact { did: did.clone(), arg: arg.clone() })
-                .filter(|unary_fact| {
-                    let atom = Atom::Construct {
-                        did: unary_fact.did.clone(),
-                        args: vec![unary_fact.arg.clone()],
-                    };
-                    !self.truths.contains(did, &atom)
-                })
+                .map(|arg| Atom::Construct { did: did.clone(), args: vec![arg.clone()] })
+                .filter(|atom| !self.truths.contains(did, atom))
         })
     }
 }
 
-impl Checked<'_> {
+impl ExecutableProgram {
     fn search_rec(&self, inner_query: &InnerQuery, stack: &mut Vec<UnaryFact>, best: &mut Best) {
-        let denotation = ProgramWithFacts { checked: self, facts: stack }.denotation();
+        let denotation = (stack.as_slice(), self).denotation();
         let badness = denotation.badness(inner_query.user_query);
         match [&badness, &best.badness] {
             [_, None] => return,
@@ -110,7 +88,7 @@ impl Checked<'_> {
         }
         let facts = denotation.all_addable_facts(inner_query);
         for fact in facts {
-            stack.push(fact);
+            stack.push(fact.clone());
             self.search_rec(inner_query, stack, best);
             stack.pop();
             if best.badness.is_none() {
@@ -120,38 +98,23 @@ impl Checked<'_> {
     }
 }
 
-impl TakesBigSteps for ProgramWithFacts<'_> {
-    fn big_step_inference(
-        &self,
-        neg: ComplementKnowledge,
-        pos_w: &mut Knowledge,
-        va: &mut VariableAssignments,
-    ) -> Knowledge {
-        for UnaryFact { did, arg } in self.facts {
-            pos_w.insert(did, Atom::Construct { did: did.clone(), args: vec![arg.clone()] });
-        }
-        self.checked.big_step_inference(neg, pos_w, va)
-    }
-}
-
-impl Checked<'_> {
-    pub fn search(&self, user_query: UserQuery) -> Best {
+impl ExecutableProgram {
+    pub fn search(&self, user_query: DomainBadnessOrder) -> Best {
         let inner_query = self.innerize_query(user_query);
         let mut best = Best { facts: vec![], badness: self.denotation().badness(user_query) };
         let mut stack = vec![];
         self.search_rec(&inner_query, &mut stack, &mut best);
         best
     }
-    fn innerize_query<'a, 'b>(&'a self, user_query: UserQuery<'b>) -> InnerQuery<'b> {
-        let sealed_domains = self.program.sealed_domains();
+    fn innerize_query<'a, 'b>(&'a self, user_query: DomainBadnessOrder<'b>) -> InnerQuery<'b> {
         let enum_construct_param = user_query
             .0
             .iter()
             .filter_map(|did| {
-                if sealed_domains.contains(did) {
+                if self.sealed.contains(did) {
                     return None;
                 }
-                if let Some((_statement_idx, params)) = self.dd.get(did) {
+                if let Some(params) = self.dd.get(did) {
                     if let [param] = params.as_slice() {
                         Some((did.clone(), param.clone()))
                     } else {
@@ -163,11 +126,5 @@ impl Checked<'_> {
             })
             .collect();
         InnerQuery { user_query, enum_construct_param }
-    }
-}
-
-impl std::fmt::Debug for UnaryFact {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}({:?})", self.did, self.arg)
     }
 }

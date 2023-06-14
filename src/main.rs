@@ -1,11 +1,6 @@
-mod ast;
-mod dynamics;
-mod parse;
-mod preprocessing;
-mod search;
-mod statics;
-mod util;
+mod lang;
 
+use lang::*;
 use std::time::{Duration, Instant};
 
 fn stdin_to_string() -> Result<String, std::io::Error> {
@@ -27,15 +22,15 @@ fn main() -> Result<(), ()> {
     let mut source = stdin_to_string().expect("bad stdin");
     preprocessing::remove_line_comments(&mut source);
     let start_i0 = Instant::now();
-    let mut parse_result = parse::program(&source);
+    let mut parse_result = parse::seaso::program(&source);
     let start_i1 = Instant::now();
     if let Ok((_input, program)) = &mut parse_result {
         preprocessing::deanonymize_variable_ids(program);
-        let check_result = program.check();
+        let executable_result = program.executable();
         let start_i2 = Instant::now();
-        if let Ok(checked) = &check_result {
-            use dynamics::Denotes as _;
-            let denotation = checked.denotation();
+        if let Ok(executable_program) = &executable_result {
+            use dynamics::Executable as _;
+            let denotation = executable_program.denotation();
             let start_i3 = Instant::now();
             println!(
                 "{:#?}",
@@ -46,16 +41,14 @@ fn main() -> Result<(), ()> {
                 }
             );
             println!("{:#?}", &denotation);
-
-            use ast::DomainId;
-            use search::UserQuery;
-            let domains = vec![DomainId("guy".into()), DomainId("none".into())];
-            let user_query = UserQuery(&domains);
-            println!("search {:#?}", checked.search(user_query));
+            use lang::search::DomainBadnessOrder;
+            let domains = [DomainId("guy".into()), DomainId("none".into())];
+            let dbo = DomainBadnessOrder(&domains);
+            println!("search {:#?}", executable_program.search(dbo));
         }
         println!("undeclared domains: {:?}", program.undeclared_domains());
         println!("seal broken: {:?}", program.seal_break());
-        println!("check error {:#?}", check_result.err());
+        println!("executable error {:#?}", executable_result.err());
     }
     println!("parse error {:?}", parse_result.err());
 

@@ -1,8 +1,4 @@
-use crate::statics::HasEmittedDomains;
-use crate::{
-    ast::*,
-    statics::{Checked, VariableTypes},
-};
+use crate::*;
 use core::fmt::Debug;
 use std::collections::{HashMap, HashSet};
 
@@ -49,19 +45,112 @@ pub enum ComplementKnowledge<'a> {
     ComplementOf(&'a Knowledge),
 }
 
-pub trait TakesBigSteps {
+// pub trait TakesBigSteps {
+//     fn big_step_inference(
+//         &self,
+//         neg: ComplementKnowledge,
+//         pos_w: &mut Knowledge,
+//         va: &mut VariableAssignments,
+//     ) -> Knowledge;
+// }
+
+// pub trait Denotes {
+//     fn denotation(&self) -> Denotation;
+// }
+
+pub trait Executable {
+    fn annotated_rules(&self) -> &[AnnotatedRule];
+    fn emissive(&self, did: &DomainId) -> bool;
+    fn starting_facts(&self) -> Knowledge;
     fn big_step_inference(
         &self,
         neg: ComplementKnowledge,
         pos_w: &mut Knowledge,
         va: &mut VariableAssignments,
-    ) -> Knowledge;
-}
-pub trait Denotes {
-    fn denotation(&self) -> Denotation;
+    ) -> Knowledge {
+        let mut pos_r = self.starting_facts();
+        loop {
+            for AnnotatedRule { v2d, rule } in self.annotated_rules() {
+                rule.inference_stage(v2d, neg, &pos_r, pos_w, va)
+            }
+            let changed = pos_r.absorb_all(pos_w);
+            if !changed {
+                assert!(pos_w.map.is_empty());
+                return pos_r;
+            }
+        }
+    }
+
+    fn denotation(&self) -> Denotation {
+        let mut pos_w = self.starting_facts();
+        let mut va = VariableAssignments::default();
+        let mut interpretations =
+            vec![self.big_step_inference(ComplementKnowledge::Empty, &mut pos_w, &mut va)];
+        loop {
+            if interpretations.len() % 2 == 1 {
+                if let [.., a, b, c, d] = interpretations.as_mut_slice() {
+                    if a == c && b == d {
+                        use std::mem::take;
+                        let truths = take(d);
+                        let mut unknowns = take(c);
+                        for (did, set) in unknowns.map.iter_mut() {
+                            set.retain(|atom| !truths.contains(did, atom))
+                        }
+                        let emissions = Knowledge {
+                            map: truths
+                                .map
+                                .iter()
+                                .filter_map(|(did, set)| {
+                                    if self.emissive(did) {
+                                        Some((did.clone(), set.clone()))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect(),
+                        };
+                        return Denotation { truths, unknowns, emissions };
+                    }
+                }
+            }
+            let neg = ComplementKnowledge::ComplementOf(interpretations.iter().last().unwrap());
+            assert!(pos_w.map.is_empty());
+            assert!(va.assignments.is_empty());
+            let pos = self.big_step_inference(neg, &mut pos_w, &mut va);
+            interpretations.push(pos);
+        }
+    }
 }
 
 //////////////////////////////////////////////////////
+
+impl Executable for ExecutableProgram {
+    fn annotated_rules(&self) -> &[AnnotatedRule] {
+        &self.annotated_rules
+    }
+    fn emissive(&self, did: &DomainId) -> bool {
+        self.emissive.contains(did)
+    }
+    fn starting_facts(&self) -> Knowledge {
+        Default::default()
+    }
+}
+
+impl Executable for (&[Atom], &ExecutableProgram) {
+    fn annotated_rules(&self) -> &[AnnotatedRule] {
+        self.1.annotated_rules()
+    }
+    fn emissive(&self, did: &DomainId) -> bool {
+        self.1.emissive(did)
+    }
+    fn starting_facts(&self) -> Knowledge {
+        let mut k = Knowledge::default();
+        for atom in self.0 {
+            k.insert(atom.domain_id(), atom.clone());
+        }
+        k
+    }
+}
 
 impl ComplementKnowledge<'_> {
     fn contains(self, did: &DomainId, atom: &Atom) -> bool {
@@ -100,7 +189,7 @@ impl std::fmt::Debug for Knowledge {
                     None
                 } else {
                     Some({
-                        let mut vec = set.iter().map(crate::util::NoPretty).collect::<Vec<_>>();
+                        let mut vec = set.iter().map(super::util::NoPretty).collect::<Vec<_>>();
                         vec.sort_by_key(|t| t.0);
                         (did, vec)
                     })
@@ -149,86 +238,6 @@ impl VariableAssignments {
     }
 }
 
-impl TakesBigSteps for Checked<'_> {
-    fn big_step_inference(
-        &self,
-        neg: ComplementKnowledge,
-        pos_w: &mut Knowledge,
-        va: &mut VariableAssignments,
-    ) -> Knowledge {
-        let mut pos_r = Knowledge::default();
-        loop {
-            for (sidx, statement) in self.program.statements.iter().enumerate() {
-                if let Statement::Rule(rule) = statement {
-                    // println!("rule at index {} ...", sidx);
-                    let v2d = self.rvt.get(&sidx).expect("wah");
-                    rule.inference_stage(v2d, neg, &pos_r, pos_w, va);
-                }
-            }
-            // println!("absorbing {:?} <= {:?}", pos_r, pos_w);
-            let changed = pos_r.absorb_all(pos_w);
-            if !changed {
-                assert!(pos_w.map.is_empty());
-                return pos_r;
-            }
-        }
-    }
-}
-
-impl HasEmittedDomains for Checked<'_> {
-    fn emitted_domains(&self) -> HashSet<&DomainId> {
-        self.program.emitted_domains()
-    }
-}
-
-impl<T> Denotes for T
-where
-    T: TakesBigSteps + HasEmittedDomains,
-{
-    /// Computes and returns the denotation of the given checked program.
-    fn denotation(&self) -> Denotation {
-        let mut pos_w = Knowledge::default();
-        let mut va = VariableAssignments::default();
-        let mut interpretations =
-            vec![self.big_step_inference(ComplementKnowledge::Empty, &mut pos_w, &mut va)];
-        loop {
-            // println!("\n>>>>>> INTERPRTATIONS: {:?}", &interpretations);
-            if interpretations.len() % 2 == 1 {
-                if let [.., a, b, c, d] = interpretations.as_mut_slice() {
-                    if a == c && b == d {
-                        use std::mem::take;
-                        let truths = take(d);
-                        let mut unknowns = take(c);
-                        for (did, set) in unknowns.map.iter_mut() {
-                            set.retain(|atom| !truths.contains(did, atom))
-                        }
-                        let emitted_dids = self.emitted_domains();
-                        let emissions = Knowledge {
-                            map: truths
-                                .map
-                                .iter()
-                                .filter_map(|(did, set)| {
-                                    if emitted_dids.contains(did) {
-                                        Some((did.clone(), set.clone()))
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect(),
-                        };
-                        return Denotation { truths, unknowns, emissions };
-                    }
-                }
-            }
-            let neg = ComplementKnowledge::ComplementOf(interpretations.iter().last().unwrap());
-            assert!(pos_w.map.is_empty());
-            assert!(va.assignments.is_empty());
-            let pos = self.big_step_inference(neg, &mut pos_w, &mut va);
-            interpretations.push(pos);
-        }
-    }
-}
-
 impl Knowledge {
     pub fn atoms_in_domain(&self, did: &DomainId) -> impl Iterator<Item = &Atom> + '_ {
         self.map.get(did).into_iter().flat_map(|set| set.iter())
@@ -253,6 +262,12 @@ impl Knowledge {
 }
 
 impl Atom {
+    fn domain_id(&self) -> &DomainId {
+        match self {
+            Atom::Construct { did, .. } => did,
+            Atom::Constant { c } => c.domain_id(),
+        }
+    }
     fn uniquely_assign_variables(
         &self,
         ra: &RuleAtom,

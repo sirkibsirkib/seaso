@@ -1,4 +1,4 @@
-use crate::ast::*;
+use crate::*;
 
 struct AnonVariableAllocator {
     next: u32,

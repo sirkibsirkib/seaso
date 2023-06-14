@@ -1,77 +1,36 @@
+use crate::*;
 use core::fmt::{Debug, Formatter, Result as FmtResult};
 
-/// Used elsewhere to identify elements in `Program` values,
-/// e.g., in error messages.
-pub type StatementIdx = usize;
+/// Newtype that suppresses pretty-printing of the wrapped type.
+/// Useful in avoiding excessive indentation of internals when pretty printing its container.
+pub(crate) struct NoPretty<T: Debug>(pub T);
 
-/// A domain identifier, acting as...
-/// 1. data types,
-/// 2. constructors of values in #1, and
-/// 3. relations whose members are in #1.
-#[derive(Ord, PartialOrd, Clone, PartialEq, Hash, Eq)]
-pub struct DomainId(pub String);
-
-/// Each identifies a variable. Used in the context of a rule.
-#[derive(Clone, PartialEq, Hash, Eq)]
-pub struct VariableId(pub String);
-
-#[derive(Ord, PartialOrd, Clone, Hash, PartialEq, Eq)]
-pub enum Constant {
-    Int(i64),
-    Str(String),
+/// Structure used in debug printing. Prints elements separated by commas.
+pub(crate) struct CommaSep<'a, T: Debug + 'a, I: IntoIterator<Item = &'a T> + Clone> {
+    pub iter: I,
+    pub spaced: bool,
 }
 
-/// "Abstract values" as they may contain variables.
-/// See `Atom` (defined in `dynamics.rs`) for the concretized version.
-#[derive(Clone, PartialEq, Hash, Eq)]
-pub enum RuleAtom {
-    Variable(VariableId),
-    Constant(Constant),
-    Construct { did: DomainId, args: Vec<RuleAtom> },
+impl<T: Debug> Debug for NoPretty<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}", &self.0)
+    }
 }
 
-/// A sequence of statements.
-#[derive(Debug, Default, Clone)]
-pub struct Program {
-    pub statements: Vec<Statement>,
+impl<'a, T: Debug + 'a, I: IntoIterator<Item = &'a T> + Clone> Debug for CommaSep<'a, T, I> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        for (i, x) in self.iter.clone().into_iter().enumerate() {
+            if i > 0 {
+                write!(f, "{}", if self.spaced { ", " } else { "," })?;
+            }
+            write!(f, "{:?}", x)?;
+        }
+        Ok(())
+    }
 }
-
-/// One of five kinds of statement.
-#[derive(Clone)]
-pub enum Statement {
-    Decl(DomainId),
-    Defn { did: DomainId, params: Vec<DomainId> },
-    Rule(Rule),
-    Seal(DomainId),
-    Emit(DomainId),
-}
-
-/// A logical implication rule with N conjunctive consequents and N conjunctive antecedents.
-#[derive(Debug, Clone)]
-pub struct Rule {
-    pub consequents: Vec<RuleAtom>,
-    pub antecedents: Vec<RuleLiteral>,
-}
-
-/// Positive or negative sign, used to negate atoms, forming literals. Newtype for clarity.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Sign {
-    Pos,
-    Neg,
-}
-
-/// A signed atom. These occur as antecedents of rules.
-#[derive(Clone)]
-pub struct RuleLiteral {
-    pub sign: Sign,
-    pub ra: RuleAtom,
-}
-
-/////////////
 
 impl Debug for RuleAtom {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        use crate::util::CommaSep;
         match self {
             Self::Variable(vid) => vid.fmt(f),
             Self::Constant(c) => c.fmt(f),
@@ -92,7 +51,6 @@ impl Debug for RuleLiteral {
 
 impl Debug for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        use crate::util::CommaSep;
         match self {
             Statement::Rule(Rule { consequents, antecedents }) => {
                 write!(f, "rule {:?}", CommaSep { iter: consequents, spaced: true })?;
