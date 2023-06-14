@@ -20,9 +20,9 @@ struct TimesTaken {
 
 fn zop() {
     let x = "
-    module a:c { seal y. }
-    module b   { defn x(y). }
-    module c   { rule Y :- x(Y). }
+    module a:b   { seal y. }
+    module b:c   { defn x(y). }
+    module c:a,b { rule Y :- x(Y). }
     ";
     let (_, mo) = parse::modules(x).expect("WAHEY");
     println!("{:?}", mo);
@@ -31,9 +31,9 @@ fn zop() {
 
     let mut sniffer = BreakSniffer::<&ModuleName>::default();
 
-    let executable_result = ExecutableProgram::new2(&module_system.map, &mut sniffer);
+    let executable_result = ExecutableProgram::new(&module_system.map, &mut sniffer);
 
-    let maybe_break = module_system.find_break(&sniffer);
+    let maybe_break = sniffer.find_break(&module_system);
 
     println!(
         "{:#?}\n{:#?}\n{:#?}\nbreak {:#?}",
@@ -51,7 +51,12 @@ fn main() -> Result<(), ()> {
     let start_i1 = Instant::now();
     if let Ok((_input, statements)) = &mut statements_result {
         preprocessing::deanonymize_variable_ids(statements);
-        let executable_result = ExecutableProgram::new(statements.0.iter());
+
+        let mut sniffer = BreakSniffer::<usize>::default();
+        let structure = statements.0.as_slice();
+
+        println!("structure {:?}", structure);
+        let executable_result = ExecutableProgram::new(structure, &mut sniffer);
         let start_i2 = Instant::now();
         if let Ok(executable_program) = &executable_result {
             use dynamics::Executable as _;
@@ -66,13 +71,16 @@ fn main() -> Result<(), ()> {
                 }
             );
             println!("{:#?}", &denotation);
+
+            let seal_break = sniffer.find_break(&());
+            println!("seal broken: {:?}", seal_break);
+
             use search::DomainBadnessOrder;
             let domains = [DomainId("guy".into()), DomainId("none".into())];
             let dbo = DomainBadnessOrder(&domains);
             println!("search {:#?}", executable_program.search(dbo));
         }
         println!("undeclared domains: {:?}", statements.undeclared_domains());
-        println!("seal broken: {:?}", statements.seal_break());
         println!("executable error {:#?}", executable_result.err());
     }
     println!("statements error {:#?}", statements_result.err());

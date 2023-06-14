@@ -36,7 +36,18 @@ pub enum ExecutableError {
     ExecutableRuleError(ExecutableRuleError),
 }
 
+// can be tested for membership of the transitive "import" relation
+pub trait StatementUsage<K> {
+    fn uses(&self, pair: [K; 2]) -> bool;
+}
+
 //////////////////
+
+impl StatementUsage<usize> for () {
+    fn uses(&self, [a, b]: [usize; 2]) -> bool {
+        a > b
+    }
+}
 
 impl<'a, K: Copy + Hash + Eq> BreakSniffer<K> {
     fn seals(&mut self, key: K, did: DomainId) {
@@ -84,31 +95,23 @@ impl<'a, K: Copy> Default for BreakSniffer<K> {
     }
 }
 
-impl ExecutableProgram {
-    // pub fn domain_definitions2<'a, K: Copy, S: StatementStructure<'a, K>>(
-    //     structure: &S,
-    // ) -> Result<DomainDefinitions, DomainDefinitionsError> {
-    //     let mut dd = DomainDefinitions::default();
-    //     for (_, statement) in structure.keyed_statements() {
-    //         if let Statement::Defn { did, params } = statement {
-    //             if did.is_primitive() {
-    //                 return Err(DomainDefinitionsError::DefiningPrimitive(did.clone()));
-    //             }
-    //             let prev = dd.insert(did.clone(), params.clone());
-    //             if let Some(previous_params) = prev {
-    //                 if &previous_params != params {
-    //                     return Err(DomainDefinitionsError::ConflictingDefinitions {
-    //                         did: did.clone(),
-    //                         params: [previous_params, params.clone()],
-    //                     });
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     Ok(dd)
-    // }
+impl<K: Copy + Eq> BreakSniffer<K> {
+    pub fn find_break<S: StatementUsage<K>>(&self, su: &S) -> Option<Break<K>> {
+        for (did, [sealers, modifiers]) in &self.sealers_modifiers {
+            for &sealer in sealers {
+                for &modifier in modifiers {
+                    if sealer != modifier && !su.uses([sealer, modifier]) {
+                        return Some(Break { did: did.clone(), sealer, modifier });
+                    }
+                }
+            }
+        }
+        None
+    }
+}
 
-    pub fn new2<'a, 'b, K: Copy + Hash + Eq, S: StatementStructure<'a, K>>(
+impl ExecutableProgram {
+    pub fn new<'a, 'b, K: Copy + Hash + Eq, S: StatementStructure<'a, K> + ?Sized>(
         structure: &'a S,
         sniffer: &'b mut BreakSniffer<K>,
     ) -> Result<Self, ExecutableError> {
@@ -140,30 +143,6 @@ impl ExecutableProgram {
         Ok(ExecutableProgram { dd, annotated_rules, emissive, sealed })
     }
 
-    pub fn new<'a>(
-        statements: impl Iterator<Item = &'a Statement> + Clone,
-    ) -> Result<Self, ExecutableError> {
-        let mut dd = DomainDefinitions::default();
-        let mut annotated_rules = vec![];
-        let mut emissive = HashSet::<DomainId>::default();
-        let mut sealed = HashSet::<DomainId>::default();
-        for statement in statements {
-            match statement {
-                Statement::Rule(rule) => {
-                    let v2d = rule.rule_type_variables(&dd)?;
-                    annotated_rules.push(AnnotatedRule { v2d, rule: rule.clone() })
-                }
-                Statement::Emit(did) => {
-                    emissive.insert(did.clone());
-                }
-                Statement::Seal(did) => {
-                    sealed.insert(did.clone());
-                }
-                _ => {}
-            }
-        }
-        Ok(ExecutableProgram { dd, annotated_rules, emissive, sealed })
-    }
     pub fn domain_definitions<'a>(
         statements: impl Iterator<Item = &'a Statement>,
     ) -> Result<DomainDefinitions, DomainDefinitionsError> {
