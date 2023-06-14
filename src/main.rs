@@ -20,9 +20,14 @@ struct TimesTaken {
 
 fn zop() {
     let x = "
-    module a:b   { seal y. }
-    module b:c   { defn x(y). }
-    module c:a,b { rule Y :- x(Y). }
+    module x:y   { defn x(y).      }
+    module y:x   { defn y(int).    }
+
+    module q     { rule 1, x(y(2)).}
+
+    module a:b   { seal y.         }
+    module b:c   {                 }
+    module c     { rule Y :- x(Y). }
     ";
     let (_, mo) = parse::modules(x).expect("WAHEY");
     println!("{:?}", mo);
@@ -31,13 +36,16 @@ fn zop() {
 
     let mut sniffer = BreakSniffer::<&ModuleName>::default();
 
-    let executable_result = ExecutableProgram::new(&module_system.map, &mut sniffer);
+    let executable_program = ExecutableProgram::new(&module_system.map, &mut sniffer).expect("wah");
+
+    use dynamics::Executable as _;
+    let denotation = executable_program.denotation();
 
     let maybe_break = sniffer.find_break(&module_system);
 
     println!(
-        "{:#?}\n{:#?}\n{:#?}\nbreak {:#?}",
-        module_system, executable_result, sniffer, maybe_break
+        "{:#?}\n{:#?}\n{:#?}\nbreak {:#?}\ndenotation: {:?}",
+        module_system, executable_program, sniffer, maybe_break, denotation
     );
     println!("//////////////////");
 }
