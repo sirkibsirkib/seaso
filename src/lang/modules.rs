@@ -41,31 +41,28 @@ pub enum ModuleSystemError<'a> {
 // m2 modifies
 
 #[derive(Debug)]
-pub struct ModuleSystem<'a> {
-    step_toward: HashMap<[&'a ModuleName; 2], &'a ModuleName>,
+pub(crate) struct ModuleSystem<'a> {
+    pub(crate) map: HashMap<&'a ModuleName, &'a Module>,
+    pub(crate) reaches: HashSet<[&'a ModuleName; 2]>,
 }
 impl<'a> ModuleSystem<'a> {
+    pub fn find_break(&self, sniffer: &BreakSniffer<&'a ModuleName>) -> Option<Break<&ModuleName>> {
+        for (did, [sealers, modifiers]) in &sniffer.sealers_modifiers {
+            for &sealer in sealers {
+                for &modifier in modifiers {
+                    if sealer != modifier && !self.reaches.contains(&[sealer, modifier]) {
+                        return Some(Break { did: did.clone(), sealer, modifier });
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub fn new(modules: impl Iterator<Item = &'a Module>) -> Result<Self, ModuleSystemError<'a>> {
         let mut map: HashMap<&ModuleName, &Module> = Default::default();
-        let mut modification: HashMap<(&ModuleName, &DomainId), &Statement> = Default::default();
         use std::collections::hash_map::Entry;
         for module in modules {
-            let add = |did, statement| {
-                modification.entry((&module.name, did)).or_insert(statement);
-            };
-            // for statement in &module.statements {
-            //     match statement {
-            //         Statement::Rule(Rule{ consequents, .. }) => {
-            //             for consequent in consequents {
-            //                 add(consequent.ra.did)
-            //             }
-            //         }
-            //         Statement::Emit(did) => {
-            //             // todo
-            //         }
-            //     }
-
-            // }
             match map.entry(&module.name) {
                 Entry::Vacant(e) => drop(e.insert(module)),
                 Entry::Occupied(e) => {
@@ -82,14 +79,14 @@ impl<'a> ModuleSystem<'a> {
         }
 
         // floyd warshall 1: self loops
-        let mut step_toward: HashMap<[&'a ModuleName; 2], &'a ModuleName> = Default::default();
+        let mut reaches = HashSet::<[&'a ModuleName; 2]>::default();
         // floyd warshall 2: given edges
         for module in map.values() {
             for dest in module.uses.elements() {
                 if dest == &module.name {
                     continue;
                 }
-                step_toward.entry([&module.name, &dest]).or_insert(&dest);
+                reaches.insert([&module.name, &dest]);
             }
         }
         // floyd warshall 3: all-to-all reachability
@@ -102,12 +99,12 @@ impl<'a> ModuleSystem<'a> {
                     if a == c || b == c {
                         continue;
                     }
-                    if step_toward.contains_key(&[a, b]) && step_toward.contains_key(&[b, c]) {
-                        step_toward.entry([a, c]).or_insert(b);
+                    if reaches.contains(&[a, b]) && reaches.contains(&[b, c]) {
+                        reaches.insert([a, c]);
                     }
                 }
             }
         }
-        Ok(ModuleSystem { step_toward })
+        Ok(ModuleSystem { map, reaches })
     }
 }

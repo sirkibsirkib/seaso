@@ -18,6 +18,22 @@ mod util;
 use crate::lang::util::VecSet;
 use std::collections::{HashMap, HashSet};
 
+pub trait StatementStructure<'a, K: Copy> {
+    fn keyed_statements(&'a self) -> Box<dyn Iterator<Item = (K, &'a Statement)> + 'a>;
+}
+
+#[derive(Debug)]
+pub struct BreakSniffer<K: Copy> {
+    sealers_modifiers: HashMap<DomainId, [HashSet<K>; 2]>,
+}
+
+#[derive(Debug)]
+pub struct Break<K> {
+    did: DomainId,
+    sealer: K,
+    modifier: K,
+}
+
 /////////////////////////////////////////////
 
 /// Used (internally) to remember where and how constructors are defined.
@@ -101,11 +117,13 @@ pub struct RuleLiteral {
     pub ra: RuleAtom,
 }
 
+#[derive(Debug)]
 pub struct AnnotatedRule {
     pub v2d: VariableTypes,
     pub rule: Rule,
 }
 
+#[derive(Debug)]
 pub struct ExecutableProgram {
     pub(crate) dd: DomainDefinitions,
     pub(crate) annotated_rules: Vec<AnnotatedRule>,

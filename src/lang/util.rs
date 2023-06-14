@@ -16,6 +16,9 @@ pub struct VecSet<T: Ord> {
     elements: Vec<T>,
 }
 
+pub fn snd<A, B>((_, b): (A, B)) -> B {
+    b
+}
 /////////////////////////
 
 impl<T: Ord> VecSet<T> {

@@ -64,20 +64,17 @@ pub fn modules(i: &str) -> IResult<&str, Vec<Module>> {
 }
 
 pub fn module(i: &str) -> IResult<&str, Module> {
-    let (i, (_, name, _, uses, _, statements, _)) = tuple((
-        ws(tag("module")),
-        module_name,
-        ws(tag(":")),
-        commasep(module_name),
-        ws(tag("{")),
-        statements,
-        ws(tag("}")),
+    // let uses =
+    let (i, (name, maybe_uses, statements)) = tuple((
+        preceded(ws(tag("module")), module_name),
+        opt(preceded(ws(tag(":")), commasep(module_name))),
+        terminated(preceded(ws(tag("{")), statements), ws(tag("}"))),
     ))(i)?;
     Ok((
         i,
         Module {
             name,
-            uses: VecSet::from_vec(uses),
+            uses: VecSet::from_vec(maybe_uses.unwrap_or_default()),
             statements: statements.0.into_iter().collect(),
         },
     ))
