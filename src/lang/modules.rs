@@ -1,9 +1,4 @@
-const TEST: &str = "
-    a,b,c!
-
-    a:b,c,d
-    @ \"dir1/dir2/filename.seaso\"
-";
+// use crate::*;
 
 use std::collections::HashSet;
 
@@ -16,7 +11,7 @@ struct ModuleName(String);
 
 struct ModuleDef {
     name: ModuleName,
-    needs: HashSet<HashSet<ModuleName>>,
+    // needs: HashSet<HashSet<ModuleName>>,
     path: ModulePath,
 }
 

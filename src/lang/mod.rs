@@ -12,12 +12,10 @@ pub mod dynamics;
 
 pub mod search;
 
-mod modules;
+// mod modules;
 mod util;
 
-use core::fmt::Debug;
-use nom::lib::std::collections::HashSet;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /////////////////////////////////////////////
 
@@ -59,9 +57,7 @@ pub enum RuleAtom {
 
 /// A sequence of statements.
 #[derive(Debug, Default, Clone)]
-pub struct Program {
-    pub statements: Vec<Statement>,
-}
+pub struct Statements(pub Vec<Statement>);
 
 /// One of five kinds of statement.
 #[derive(Clone)]
@@ -72,6 +68,18 @@ pub enum Statement {
     Seal(DomainId),
     Emit(DomainId),
 }
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ModuleName(pub String);
+
+#[derive(Debug)]
+pub struct Module {
+    pub name: ModuleName,
+    pub uses: HashSet<ModuleName>,
+    pub statements: Statements,
+}
+
+pub struct ModuleSystem {}
 
 /// A logical implication rule with N conjunctive consequents and N conjunctive antecedents.
 #[derive(Debug, Clone)]

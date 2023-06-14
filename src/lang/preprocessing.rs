@@ -25,14 +25,14 @@ pub fn remove_line_comments(s: &mut String) {
 
 /// Replaces each occurrence of `VariableId("_")` with a new identifier.
 /// Assumes that no variables already in the program have prefix "v", which is the case for all parsed programs.
-pub fn deanonymize_variable_ids(program: &mut Program) {
+pub fn deanonymize_variable_ids(statements: &mut Statements) {
     // let mut ava = AnonVariableAllocator { next: 0 };
-    program.deanonymize_vids(&mut AnonVariableAllocator { next: 0 })
+    statements.deanonymize_vids(&mut AnonVariableAllocator { next: 0 })
 }
 
-impl DeanonymizeVids for Program {
+impl DeanonymizeVids for Statements {
     fn deanonymize_vids(&mut self, ava: &mut AnonVariableAllocator) {
-        for statement in &mut self.statements {
+        for statement in &mut self.0 {
             if let Statement::Rule(Rule { antecedents, .. }) = statement {
                 // Only deanonymize ENUMERABLE variables!
                 for antecedent in antecedents {

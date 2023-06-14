@@ -50,10 +50,10 @@ impl From<ExecutableRuleError> for ExecutableError {
         Self::ExecutableRuleError(e)
     }
 }
-impl Program {
+impl Statements {
     pub fn domain_definitions(&self) -> Result<DomainDefinitions, DomainDefinitionsError> {
         let mut dd = DomainDefinitions::default();
-        for statement in &self.statements {
+        for statement in &self.0 {
             if let Statement::Defn { did, params } = statement {
                 if did.is_primitive() {
                     return Err(DomainDefinitionsError::DefiningPrimitive(did.clone()));
@@ -76,7 +76,7 @@ impl Program {
         let mut annotated_rules = vec![];
         let mut emissive = HashSet::<DomainId>::default();
         let mut sealed = HashSet::<DomainId>::default();
-        for statement in &self.statements {
+        for statement in &self.0 {
             match statement {
                 Statement::Rule(rule) => {
                     let v2d = rule.rule_type_variables(&dd)?;
@@ -94,20 +94,13 @@ impl Program {
         Ok(ExecutableProgram { dd, annotated_rules, emissive, sealed })
     }
 
-    pub fn sealed_domains(&self) -> impl Iterator<Item = &DomainId> {
-        self.statements.iter().filter_map(|statement| match statement {
-            Statement::Seal(did) => Some(did),
-            _ => None,
-        })
-    }
-
     /// Returns all domains used but not declared, which is trivially
     /// adapted to enforce the `all used types are declared` well-formedness criterion.
     pub fn undeclared_domains(&self) -> HashSet<&DomainId> {
         // step 2: all occurring constructs are declared
         let declared = self.declarations();
         let mut occurring = HashSet::default();
-        for statement in &self.statements {
+        for statement in &self.0 {
             statement.occurring_domain_ids(&mut occurring)
         }
         occurring.retain(|did| !declared.contains(did));
@@ -118,7 +111,7 @@ impl Program {
     pub fn seal_break(&self) -> Option<SealBreak> {
         type LastSealedAt = HashMap<DomainId, StatementIdx>;
         let mut lsa = LastSealedAt::default();
-        for (sidx, statement) in self.statements.iter().enumerate() {
+        for (sidx, statement) in self.0.iter().enumerate() {
             match statement {
                 Statement::Seal(did) => {
                     lsa.insert(did.clone(), sidx);
@@ -153,7 +146,7 @@ impl Program {
 
     /// Returns the set of all declared domains.
     pub fn declarations(&self) -> HashSet<DomainId> {
-        self.statements
+        self.0
             .iter()
             .filter_map(|statement| match statement {
                 Statement::Decl(did) | Statement::Defn { did, .. } => Some(did.clone()),

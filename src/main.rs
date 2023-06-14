@@ -18,15 +18,24 @@ struct TimesTaken {
     denote: Duration,
 }
 
+fn zop() {
+    let x = "
+    module wenis: wang, willy, bop {}
+    ";
+    let q = parse::modules(x);
+    println!("{:?}", q);
+}
+
 fn main() -> Result<(), ()> {
+    zop();
     let mut source = stdin_to_string().expect("bad stdin");
     preprocessing::remove_line_comments(&mut source);
     let start_i0 = Instant::now();
-    let mut parse_result = parse::seaso::program(&source);
+    let mut statements_result = nom::combinator::all_consuming(parse::statements)(&source);
     let start_i1 = Instant::now();
-    if let Ok((_input, program)) = &mut parse_result {
-        preprocessing::deanonymize_variable_ids(program);
-        let executable_result = program.executable();
+    if let Ok((_input, statements)) = &mut statements_result {
+        preprocessing::deanonymize_variable_ids(statements);
+        let executable_result = statements.executable();
         let start_i2 = Instant::now();
         if let Ok(executable_program) = &executable_result {
             use dynamics::Executable as _;
@@ -41,16 +50,16 @@ fn main() -> Result<(), ()> {
                 }
             );
             println!("{:#?}", &denotation);
-            use lang::search::DomainBadnessOrder;
+            use search::DomainBadnessOrder;
             let domains = [DomainId("guy".into()), DomainId("none".into())];
             let dbo = DomainBadnessOrder(&domains);
             println!("search {:#?}", executable_program.search(dbo));
         }
-        println!("undeclared domains: {:?}", program.undeclared_domains());
-        println!("seal broken: {:?}", program.seal_break());
+        println!("undeclared domains: {:?}", statements.undeclared_domains());
+        println!("seal broken: {:?}", statements.seal_break());
         println!("executable error {:#?}", executable_result.err());
     }
-    println!("parse error {:?}", parse_result.err());
+    println!("statements error {:#?}", statements_result.err());
 
     Ok(())
 }
