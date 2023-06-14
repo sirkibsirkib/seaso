@@ -50,10 +50,36 @@ impl From<ExecutableRuleError> for ExecutableError {
         Self::ExecutableRuleError(e)
     }
 }
-impl Statements {
-    pub fn domain_definitions(&self) -> Result<DomainDefinitions, DomainDefinitionsError> {
+impl ExecutableProgram {
+    pub fn new<'a>(
+        statements: impl Iterator<Item = &'a Statement> + Clone,
+    ) -> Result<Self, ExecutableError> {
+        let dd = Self::domain_definitions(statements.clone())?;
+        let mut annotated_rules = vec![];
+        let mut emissive = HashSet::<DomainId>::default();
+        let mut sealed = HashSet::<DomainId>::default();
+        for statement in statements {
+            match statement {
+                Statement::Rule(rule) => {
+                    let v2d = rule.rule_type_variables(&dd)?;
+                    annotated_rules.push(AnnotatedRule { v2d, rule: rule.clone() })
+                }
+                Statement::Emit(did) => {
+                    emissive.insert(did.clone());
+                }
+                Statement::Seal(did) => {
+                    sealed.insert(did.clone());
+                }
+                _ => {}
+            }
+        }
+        Ok(ExecutableProgram { dd, annotated_rules, emissive, sealed })
+    }
+    pub fn domain_definitions<'a>(
+        statements: impl Iterator<Item = &'a Statement> + Clone,
+    ) -> Result<DomainDefinitions, DomainDefinitionsError> {
         let mut dd = DomainDefinitions::default();
-        for statement in &self.0 {
+        for statement in statements {
             if let Statement::Defn { did, params } = statement {
                 if did.is_primitive() {
                     return Err(DomainDefinitionsError::DefiningPrimitive(did.clone()));
@@ -71,29 +97,8 @@ impl Statements {
         }
         Ok(dd)
     }
-    pub fn executable(&self) -> Result<ExecutableProgram, ExecutableError> {
-        let dd = self.domain_definitions()?;
-        let mut annotated_rules = vec![];
-        let mut emissive = HashSet::<DomainId>::default();
-        let mut sealed = HashSet::<DomainId>::default();
-        for statement in &self.0 {
-            match statement {
-                Statement::Rule(rule) => {
-                    let v2d = rule.rule_type_variables(&dd)?;
-                    annotated_rules.push(AnnotatedRule { v2d, rule: rule.clone() })
-                }
-                Statement::Emit(did) => {
-                    emissive.insert(did.clone());
-                }
-                Statement::Seal(did) => {
-                    sealed.insert(did.clone());
-                }
-                _ => {}
-            }
-        }
-        Ok(ExecutableProgram { dd, annotated_rules, emissive, sealed })
-    }
-
+}
+impl Statements {
     /// Returns all domains used but not declared, which is trivially
     /// adapted to enforce the `all used types are declared` well-formedness criterion.
     pub fn undeclared_domains(&self) -> HashSet<&DomainId> {

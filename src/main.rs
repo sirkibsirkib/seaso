@@ -20,10 +20,14 @@ struct TimesTaken {
 
 fn zop() {
     let x = "
-    module wenis: wang, willy, bop {}
+    module a: b, c {}
+    module b: c {}
+    module c: a {}
     ";
-    let q = parse::modules(x);
+    let q = parse::modules(x).expect("WAHEY");
     println!("{:?}", q);
+    let q = modules::ModuleSystem::new(q.1.iter());
+    println!("{:#?}", q);
 }
 
 fn main() -> Result<(), ()> {
@@ -35,7 +39,7 @@ fn main() -> Result<(), ()> {
     let start_i1 = Instant::now();
     if let Ok((_input, statements)) = &mut statements_result {
         preprocessing::deanonymize_variable_ids(statements);
-        let executable_result = statements.executable();
+        let executable_result = ExecutableProgram::new(statements.0.iter());
         let start_i2 = Instant::now();
         if let Ok(executable_program) = &executable_result {
             use dynamics::Executable as _;

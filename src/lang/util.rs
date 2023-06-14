@@ -11,6 +11,39 @@ pub(crate) struct CommaSep<'a, T: Debug + 'a, I: IntoIterator<Item = &'a T> + Cl
     pub spaced: bool,
 }
 
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct VecSet<T: Ord> {
+    elements: Vec<T>,
+}
+
+/////////////////////////
+
+impl<T: Ord> VecSet<T> {
+    pub fn from_vec(mut elements: Vec<T>) -> Self {
+        elements.sort();
+        elements.dedup();
+        Self { elements }
+    }
+    pub fn elements(&self) -> &Vec<T> {
+        &self.elements
+    }
+    pub fn insert(&mut self, t: T) -> Option<T> {
+        match self.elements.binary_search(&t) {
+            Ok(idx) => {
+                let mutref = unsafe {
+                    // safe! just did range check
+                    self.elements.get_unchecked_mut(idx)
+                };
+                Some(std::mem::replace(mutref, t))
+            }
+            Err(idx) => {
+                self.elements.insert(idx, t);
+                None
+            }
+        }
+    }
+}
+
 impl<T: Debug> Debug for NoPretty<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:?}", &self.0)

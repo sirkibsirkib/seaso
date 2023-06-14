@@ -12,9 +12,10 @@ pub mod dynamics;
 
 pub mod search;
 
-// mod modules;
+pub mod modules;
 mod util;
 
+use crate::lang::util::VecSet;
 use std::collections::{HashMap, HashSet};
 
 /////////////////////////////////////////////
@@ -37,7 +38,7 @@ pub type StatementIdx = usize;
 pub struct DomainId(pub String);
 
 /// Each identifies a variable. Used in the context of a rule.
-#[derive(Clone, PartialEq, Hash, Eq)]
+#[derive(Clone, PartialEq, Hash, Eq, Ord, PartialOrd)]
 pub struct VariableId(pub String);
 
 #[derive(Ord, PartialOrd, Clone, Hash, PartialEq, Eq)]
@@ -48,7 +49,7 @@ pub enum Constant {
 
 /// "Abstract values" as they may contain variables.
 /// See `Atom` (defined in `dynamics.rs`) for the concretized version.
-#[derive(Clone, PartialEq, Hash, Eq)]
+#[derive(Clone, PartialEq, Hash, Eq, Ord, PartialOrd)]
 pub enum RuleAtom {
     Variable(VariableId),
     Constant(Constant),
@@ -56,11 +57,11 @@ pub enum RuleAtom {
 }
 
 /// A sequence of statements.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Hash)]
 pub struct Statements(pub Vec<Statement>);
 
 /// One of five kinds of statement.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum Statement {
     Decl(DomainId),
     Defn { did: DomainId, params: Vec<DomainId> },
@@ -69,34 +70,32 @@ pub enum Statement {
     Emit(DomainId),
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct ModuleName(pub String);
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Module {
     pub name: ModuleName,
-    pub uses: HashSet<ModuleName>,
-    pub statements: Statements,
+    pub uses: VecSet<ModuleName>,
+    pub statements: HashSet<Statement>, // sorted, deduplicated
 }
 
-pub struct ModuleSystem {}
-
 /// A logical implication rule with N conjunctive consequents and N conjunctive antecedents.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Rule {
     pub consequents: Vec<RuleAtom>,
     pub antecedents: Vec<RuleLiteral>,
 }
 
 /// Positive or negative sign, used to negate atoms, forming literals. Newtype for clarity.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Sign {
     Pos,
     Neg,
 }
 
 /// A signed atom. These occur as antecedents of rules.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct RuleLiteral {
     pub sign: Sign,
     pub ra: RuleAtom,

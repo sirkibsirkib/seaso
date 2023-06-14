@@ -1,3 +1,4 @@
+use crate::lang::VecSet;
 use crate::*;
 use nom::{
     branch::alt,
@@ -72,7 +73,14 @@ pub fn module(i: &str) -> IResult<&str, Module> {
         statements,
         ws(tag("}")),
     ))(i)?;
-    Ok((i, Module { name, uses: uses.into_iter().collect(), statements }))
+    Ok((
+        i,
+        Module {
+            name,
+            uses: VecSet::from_vec(uses),
+            statements: statements.0.into_iter().collect(),
+        },
+    ))
 }
 
 pub fn statements(i: &str) -> IResult<&str, Statements> {
