@@ -1,0 +1,6 @@
+part x: y {
+    seal x.
+}
+defn x(int).
+rule 1.
+rule x(I) :- I.

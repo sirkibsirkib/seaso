@@ -45,19 +45,6 @@ pub enum ComplementKnowledge<'a> {
     ComplementOf(&'a Knowledge),
 }
 
-// pub trait TakesBigSteps {
-//     fn big_step_inference(
-//         &self,
-//         neg: ComplementKnowledge,
-//         pos_w: &mut Knowledge,
-//         va: &mut VariableAssignments,
-//     ) -> Knowledge;
-// }
-
-// pub trait Denotes {
-//     fn denotation(&self) -> Denotation;
-// }
-
 pub trait Executable {
     fn annotated_rules(&self) -> &[AnnotatedRule];
     fn emissive(&self, did: &DomainId) -> bool;

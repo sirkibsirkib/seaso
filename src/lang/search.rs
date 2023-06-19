@@ -99,6 +99,12 @@ impl ExecutableProgram {
 }
 
 impl ExecutableProgram {
+    fn sealed(&self, did: &DomainId) -> bool {
+        self.sealers_modifiers.get(did).map(|dsm| !dsm.sealers.is_empty()).unwrap_or(false)
+    }
+}
+
+impl ExecutableProgram {
     pub fn search(&self, user_query: DomainBadnessOrder) -> Best {
         let inner_query = self.innerize_query(user_query);
         let mut best = Best { facts: vec![], badness: self.denotation().badness(user_query) };
@@ -111,7 +117,7 @@ impl ExecutableProgram {
             .0
             .iter()
             .filter_map(|did| {
-                if self.sealed.contains(did) {
+                if self.sealed(did) {
                     return None;
                 }
                 if let Some(params) = self.dd.get(did) {

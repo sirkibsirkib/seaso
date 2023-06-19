@@ -12,27 +12,10 @@ pub mod dynamics;
 
 pub mod search;
 
-pub mod modules;
-mod util;
+pub mod util;
 
 use crate::lang::util::VecSet;
 use std::collections::{HashMap, HashSet};
-
-pub trait StatementStructure<'a, K: Copy> {
-    fn keyed_statements(&'a self) -> Box<dyn Iterator<Item = (K, &'a Statement)> + 'a>;
-}
-
-#[derive(Debug)]
-pub struct BreakSniffer<K: Copy> {
-    sealers_modifiers: HashMap<DomainId, [HashSet<K>; 2]>,
-}
-
-#[derive(Debug)]
-pub struct Break<K> {
-    did: DomainId,
-    sealer: K,
-    modifier: K,
-}
 
 /////////////////////////////////////////////
 
@@ -41,10 +24,6 @@ pub type DomainDefinitions = HashMap<DomainId, Vec<DomainId>>;
 
 /// These annotate statements, prescribing exactly one type to each variable.
 pub type VariableTypes = HashMap<VariableId, DomainId>;
-
-/// Used elsewhere to identify elements in `Program` values,
-/// e.g., in error messages.
-pub type StatementIdx = usize;
 
 /// A domain identifier, acting as...
 /// 1. data types,
@@ -72,9 +51,9 @@ pub enum RuleAtom {
     Construct { did: DomainId, args: Vec<RuleAtom> },
 }
 
-/// A sequence of statements.
-#[derive(Debug, Default, Clone, Eq, PartialEq, Hash)]
-pub struct Statements(pub Vec<Statement>);
+// /// A sequence of statements.
+// #[derive(Debug, Default, Clone, Eq, PartialEq, Hash)]
+// pub struct Statements(pub Vec<Statement>);
 
 /// One of five kinds of statement.
 #[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -86,14 +65,17 @@ pub enum Statement {
     Emit(DomainId),
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct ModuleName(pub String);
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Module {
     pub name: ModuleName,
     pub uses: VecSet<ModuleName>,
-    pub statements: HashSet<Statement>, // sorted, deduplicated
+    pub statements: VecSet<Statement>,
+}
+pub struct ModulePreorder<'a> {
+    edges: HashSet<[&'a ModuleName; 2]>,
 }
 
 /// A logical implication rule with N conjunctive consequents and N conjunctive antecedents.
@@ -123,10 +105,23 @@ pub struct AnnotatedRule {
     pub rule: Rule,
 }
 
+#[derive(Debug, Default)]
+pub struct DomainSealersModifiers {
+    sealers: HashSet<ModuleName>,
+    modifiers: HashSet<ModuleName>,
+}
+
 #[derive(Debug)]
 pub struct ExecutableProgram {
     pub(crate) dd: DomainDefinitions,
     pub(crate) annotated_rules: Vec<AnnotatedRule>,
     pub emissive: HashSet<DomainId>,
-    pub sealed: HashSet<DomainId>,
+    pub sealers_modifiers: HashMap<DomainId, DomainSealersModifiers>,
+}
+
+pub type SallocKey = u16;
+pub struct StringAlloc {
+    string_index: HashMap<String, SallocKey>,
+    strings: Vec<String>,
+    next_key: SallocKey,
 }

@@ -1,5 +1,9 @@
 use crate::*;
-use core::fmt::{Debug, Formatter, Result as FmtResult};
+use core::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    hash::Hash,
+};
+use std::collections::HashMap;
 
 /// Newtype that suppresses pretty-printing of the wrapped type.
 /// Useful in avoiding excessive indentation of internals when pretty printing its container.
@@ -19,8 +23,42 @@ pub struct VecSet<T: Ord> {
 pub fn snd<A, B>((_, b): (A, B)) -> B {
     b
 }
-/////////////////////////
+// while this exists, the vecset has a violated invariant
+pub struct VecSetMutGuard<'a, T: Ord> {
+    set: &'a mut VecSet<T>,
+}
 
+/////////////////////////
+pub fn collect_map_lossless<K: Copy + Eq + Hash, V, I: IntoIterator<Item = (K, V)>>(
+    iter: I,
+) -> Result<HashMap<K, V>, K> {
+    let mut map = HashMap::default();
+    for (key, value) in iter.into_iter() {
+        if map.insert(key, value).is_some() {
+            return Err(key);
+        }
+    }
+    Ok(map)
+}
+
+impl<'a, T: Ord> Drop for VecSetMutGuard<'a, T> {
+    fn drop(&mut self) {
+        self.set.elements.sort();
+        self.set.elements.dedup();
+    }
+}
+impl<T: Ord> Default for VecSet<T> {
+    fn default() -> Self {
+        Self { elements: vec![] }
+    }
+}
+impl<'a, T: Ord> IntoIterator for VecSet<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<T>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.elements.into_iter()
+    }
+}
 impl<T: Ord> VecSet<T> {
     pub fn from_vec(mut elements: Vec<T>) -> Self {
         elements.sort();
@@ -44,6 +82,26 @@ impl<T: Ord> VecSet<T> {
                 None
             }
         }
+    }
+    pub fn as_slice_mut(&mut self) -> VecSetMutGuard<T> {
+        VecSetMutGuard { set: self }
+    }
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.elements.iter()
+    }
+}
+impl<'a, T: Ord> AsMut<[T]> for VecSetMutGuard<'a, T> {
+    fn as_mut(&mut self) -> &mut [T] {
+        self.set.elements.as_mut()
+    }
+}
+impl<T: Ord> FromIterator<T> for VecSet<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let mut x = Self::default();
+        for q in iter {
+            x.insert(q);
+        }
+        x
     }
 }
 
@@ -122,5 +180,25 @@ impl Debug for Constant {
 impl Debug for VariableId {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{}", &self.0)
+    }
+}
+
+impl StringAlloc {
+    pub fn add_string(&mut self, string: &str) -> SallocKey {
+        if let Some(&k) = self.string_index.get(string) {
+            return k;
+        } else {
+            let this_key = self.next_key;
+            let new_next: SallocKey = self.next_key.checked_add(1).expect("ran out of keys!");
+            self.next_key = new_next;
+            self.string_index.insert(string.to_owned(), this_key);
+            this_key
+        }
+    }
+    pub fn get_string(&self, key: SallocKey) -> Option<&str> {
+        self.strings.get(key as usize).map(String::as_str)
+    }
+    pub fn get_key(&self, string: &str) -> Option<SallocKey> {
+        self.string_index.get(string).copied()
     }
 }

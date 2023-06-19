@@ -1,6 +1,7 @@
 mod lang;
 
 use lang::*;
+use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
 fn stdin_to_string() -> Result<String, std::io::Error> {
@@ -10,88 +11,51 @@ fn stdin_to_string() -> Result<String, std::io::Error> {
     Ok(buffer)
 }
 
-#[allow(dead_code)]
-#[derive(Debug)]
-struct TimesTaken {
-    parse: Duration,
-    check: Duration,
-    denote: Duration,
-}
-
-fn zop() {
-    let x = "
-    module x:y   { defn x(y).      }
-    module y:x   { defn y(int).    }
-
-    module q     { rule 1, x(y(2)).}
-
-    module a:b   { seal y.         }
-    module b:c   {                 }
-    module c     { rule Y :- x(Y). }
-    ";
-    let (_, mo) = parse::modules(x).expect("WAHEY");
-    println!("{:?}", mo);
-
-    let module_system = modules::ModuleSystem::new(mo.iter()).expect("whaey");
-
-    let mut sniffer = BreakSniffer::<&ModuleName>::default();
-
-    let executable_program = ExecutableProgram::new(&module_system.map, &mut sniffer).expect("wah");
-
-    use dynamics::Executable as _;
-    let denotation = executable_program.denotation();
-
-    let maybe_break = sniffer.find_break(&module_system);
-
-    println!(
-        "{:#?}\n{:#?}\n{:#?}\nbreak {:#?}\ndenotation: {:?}",
-        module_system, executable_program, sniffer, maybe_break, denotation
-    );
-    println!("//////////////////");
+fn timed<T>(func: impl FnOnce() -> T) -> (Duration, T) {
+    let start = Instant::now();
+    let res = func();
+    (start.elapsed(), res)
 }
 
 fn main() -> Result<(), ()> {
-    zop();
-    let mut source = stdin_to_string().expect("bad stdin");
-    preprocessing::remove_line_comments(&mut source);
-    let start_i0 = Instant::now();
-    let mut statements_result = nom::combinator::all_consuming(parse::statements)(&source);
-    let start_i1 = Instant::now();
-    if let Ok((_input, statements)) = &mut statements_result {
-        preprocessing::deanonymize_variable_ids(statements);
+    let source = stdin_to_string().expect("bad stdin");
+    let source = preprocessing::line_comments_removed(source);
 
-        let mut sniffer = BreakSniffer::<usize>::default();
-        let structure = statements.0.as_slice();
+    let mut parse_result = nom::combinator::all_consuming(parse::modules_and_statements)(&source);
 
-        println!("structure {:?}", structure);
-        let executable_result = ExecutableProgram::new(structure, &mut sniffer);
-        let start_i2 = Instant::now();
-        if let Ok(executable_program) = &executable_result {
-            use dynamics::Executable as _;
-            let denotation = executable_program.denotation();
-            let start_i3 = Instant::now();
-            println!(
-                "{:#?}",
-                TimesTaken {
-                    parse: start_i1 - start_i0,
-                    check: start_i2 - start_i1,
-                    denote: start_i3 - start_i2
+    match &mut parse_result {
+        Ok((_, modules)) => {
+            println!("modules: {:#?}", modules);
+            for module in modules.iter_mut() {
+                preprocessing::NamesVariables::name_variables(module)
+            }
+            let module_map_result =
+                util::collect_map_lossless(modules.iter().map(|module| (&module.name, module)));
+            match module_map_result {
+                Err(clashing_name) => {
+                    println!("clashing module name: {:?}", clashing_name)
                 }
-            );
-            println!("{:#?}", &denotation);
+                Ok(module_map) => {
+                    let uumn =
+                        statics::used_undefined_module_names(&module_map).collect::<HashSet<_>>();
+                    println!("used_undefined_module: {:#?}", uumn);
 
-            let seal_break = sniffer.find_break(&());
-            println!("seal broken: {:?}", seal_break);
+                    let mp = ModulePreorder::new(&module_map);
+                    let ep = ExecutableProgram::new(&module_map);
+                    if let Ok(ep) = ep.as_ref() {
+                        let seal_breaks = mp.iter_breaks(&ep).collect::<HashSet<_>>();
+                        println!("seal_breaks: {:#?}", &seal_breaks);
 
-            use search::DomainBadnessOrder;
-            let domains = [DomainId("guy".into()), DomainId("none".into())];
-            let dbo = DomainBadnessOrder(&domains);
-            println!("search {:#?}", executable_program.search(dbo));
+                        let denotation = dynamics::Executable::denotation(ep);
+                        println!("denotation: {:#?}", &denotation);
+                    }
+                }
+            }
         }
-        println!("undeclared domains: {:?}", statements.undeclared_domains());
-        println!("executable error {:#?}", executable_result.err());
+        Err(e) => {
+            println!("parse error: {:#?}", e);
+        }
     }
-    println!("statements error {:#?}", statements_result.err());
 
     Ok(())
 }

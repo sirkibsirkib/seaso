@@ -1,17 +1,17 @@
 use crate::lang::util::snd;
 use crate::*;
-use core::hash::Hash;
+
 use std::{
     collections::{HashMap, HashSet},
     sync::OnceLock,
 };
 
 /// Identifies which statements first seal and then modify which domain.
-#[derive(Debug)]
-pub struct SealBreak {
-    pub sealed: StatementIdx,
-    pub modified: StatementIdx,
-    pub did: DomainId,
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub struct SealBreak<'a> {
+    pub did: &'a DomainId,
+    pub modifier: &'a ModuleName,
+    pub sealer: &'a ModuleName,
 }
 
 #[derive(Debug)]
@@ -36,25 +36,62 @@ pub enum ExecutableError {
     ExecutableRuleError(ExecutableRuleError),
 }
 
-// can be tested for membership of the transitive "import" relation
-pub trait StatementUsage<K> {
-    fn uses(&self, pair: [K; 2]) -> bool;
-}
-
 //////////////////
 
-impl StatementUsage<usize> for () {
-    fn uses(&self, [a, b]: [usize; 2]) -> bool {
-        a > b
-    }
+pub fn used_undefined_module_names<'a>(
+    module_map: &'a HashMap<&'a ModuleName, &'a Module>,
+) -> impl Iterator<Item = &ModuleName> {
+    used_modules(module_map).filter(|name| !module_map.contains_key(name))
+}
+pub fn used_modules<'a>(
+    module_map: &'a HashMap<&'a ModuleName, &'a Module>,
+) -> impl Iterator<Item = &ModuleName> {
+    module_map.values().flat_map(|module| module.uses.iter())
 }
 
-impl<'a, K: Copy + Hash + Eq> BreakSniffer<K> {
-    fn seals(&mut self, key: K, did: DomainId) {
-        self.sealers_modifiers.entry(did).or_default()[0].insert(key);
+impl<'a> ModulePreorder<'a> {
+    pub fn new(module_map: &'a HashMap<&'a ModuleName, &'a Module>) -> Self {
+        let mut edges = HashSet::<[&'a ModuleName; 2]>::default();
+        for (&x, module) in module_map {
+            for y in module.uses.iter() {
+                if x != y {
+                    edges.insert([x, y]);
+                }
+            }
+        }
+        for &x in module_map.keys() {
+            for &y in module_map.keys() {
+                if x != y {
+                    for &z in module_map.keys() {
+                        if x != z
+                            && y != z
+                            && edges.contains(&[x, y])
+                            && edges.contains(&[y, z])
+                            && !edges.contains(&[x, z])
+                        {
+                            edges.insert([&x, &z]);
+                        }
+                    }
+                }
+            }
+        }
+        Self { edges }
     }
-    fn modifies(&mut self, key: K, did: DomainId) {
-        self.sealers_modifiers.entry(did).or_default()[1].insert(key);
+
+    pub fn iter_breaks<'b: 'a>(
+        &'a self,
+        ep: &'b ExecutableProgram,
+    ) -> impl Iterator<Item = SealBreak<'a>> + 'a {
+        ep.sealers_modifiers.iter().flat_map(move |(did, dsm)| {
+            dsm.sealers.iter().flat_map(move |sealer| {
+                dsm.modifiers
+                    .iter()
+                    .filter(move |&modifier| {
+                        sealer != modifier && !self.edges.contains(&[sealer, modifier])
+                    })
+                    .map(move |modifier| SealBreak { sealer, modifier, did })
+            })
+        })
     }
 }
 
@@ -73,74 +110,55 @@ impl From<ExecutableRuleError> for ExecutableError {
     }
 }
 
-impl<'a> StatementStructure<'a, usize> for [Statement] {
-    fn keyed_statements(&'a self) -> Box<dyn Iterator<Item = (usize, &'a Statement)> + 'a> {
-        Box::new(self.iter().enumerate())
-    }
-}
-
-impl<'a> StatementStructure<'a, &'a ModuleName> for HashMap<&'a ModuleName, &'a Module> {
-    fn keyed_statements(
-        &'a self,
-    ) -> Box<dyn Iterator<Item = (&'a ModuleName, &'a Statement)> + 'a> {
-        Box::new(self.iter().flat_map(move |(&name, module)| {
-            module.statements.iter().map(move |statement| (name, statement))
-        }))
-    }
-}
-
-impl<'a, K: Copy> Default for BreakSniffer<K> {
-    fn default() -> Self {
-        Self { sealers_modifiers: Default::default() }
-    }
-}
-
-impl<K: Copy + Eq> BreakSniffer<K> {
-    pub fn find_break<S: StatementUsage<K>>(&self, su: &S) -> Option<Break<K>> {
-        for (did, [sealers, modifiers]) in &self.sealers_modifiers {
-            for &sealer in sealers {
-                for &modifier in modifiers {
-                    if sealer != modifier && !su.uses([sealer, modifier]) {
-                        return Some(Break { did: did.clone(), sealer, modifier });
-                    }
-                }
-            }
-        }
-        None
-    }
+fn module_statements<'a>(
+    module_map: &'a HashMap<&'a ModuleName, &'a Module>,
+) -> impl Iterator<Item = (&ModuleName, &Statement)> {
+    module_map.iter().flat_map(move |(&module_name, module)| {
+        module.statements.iter().map(move |statement| (module_name, statement))
+    })
 }
 
 impl ExecutableProgram {
-    pub fn new<'a, 'b, K: Copy + Hash + Eq, S: StatementStructure<'a, K> + ?Sized>(
-        structure: &'a S,
-        sniffer: &'b mut BreakSniffer<K>,
-    ) -> Result<Self, ExecutableError> {
+    pub fn new(module_map: &HashMap<&ModuleName, &Module>) -> Result<Self, ExecutableError> {
         // pass 1: aggregate definitions
-        let dd = Self::domain_definitions(structure.keyed_statements().map(snd))?;
+        let dd = Self::domain_definitions(module_statements(module_map).map(snd))?;
+
         let mut annotated_rules = vec![];
+        let mut sealers_modifiers = HashMap::<DomainId, DomainSealersModifiers>::default();
         let mut emissive = HashSet::<DomainId>::default();
-        let mut sealed = HashSet::<DomainId>::default();
-        for (key, statement) in structure.keyed_statements() {
+
+        for (module_name, statement) in module_statements(module_map) {
             match statement {
                 Statement::Rule(rule) => {
                     let v2d = rule.rule_type_variables(&dd)?;
                     for did in rule.consequents.iter().map(|x| x.domain_id(&v2d).expect("WAH")) {
-                        sniffer.modifies(key, did.clone());
+                        sealers_modifiers
+                            .entry(did.clone())
+                            .or_default()
+                            .modifiers
+                            .insert(module_name.clone());
                     }
                     annotated_rules.push(AnnotatedRule { v2d, rule: rule.clone() })
                 }
                 Statement::Emit(did) => {
-                    sniffer.modifies(key, did.clone());
+                    sealers_modifiers
+                        .entry(did.clone())
+                        .or_default()
+                        .modifiers
+                        .insert(module_name.clone());
                     emissive.insert(did.clone());
                 }
                 Statement::Seal(did) => {
-                    sniffer.seals(key, did.clone());
-                    sealed.insert(did.clone());
+                    sealers_modifiers
+                        .entry(did.clone())
+                        .or_default()
+                        .sealers
+                        .insert(module_name.clone());
                 }
                 _ => {}
             }
         }
-        Ok(ExecutableProgram { dd, annotated_rules, emissive, sealed })
+        Ok(ExecutableProgram { dd, annotated_rules, emissive, sealers_modifiers })
     }
 
     pub fn domain_definitions<'a>(
@@ -166,69 +184,6 @@ impl ExecutableProgram {
         Ok(dd)
     }
 }
-impl Statements {
-    /// Returns all domains used but not declared, which is trivially
-    /// adapted to enforce the `all used types are declared` well-formedness criterion.
-    pub fn undeclared_domains(&self) -> HashSet<&DomainId> {
-        // step 2: all occurring constructs are declared
-        let declared = self.declarations();
-        let mut occurring = HashSet::default();
-        for statement in &self.0 {
-            statement.occurring_domain_ids(&mut occurring)
-        }
-        occurring.retain(|did| !declared.contains(did));
-        occurring
-    }
-
-    /// Checks the `mut-after-seal` well-formedness criterion.
-    pub fn seal_break(&self) -> Option<SealBreak> {
-        type LastSealedAt = HashMap<DomainId, StatementIdx>;
-        let mut lsa = LastSealedAt::default();
-        for (sidx, statement) in self.0.iter().enumerate() {
-            match statement {
-                Statement::Seal(did) => {
-                    lsa.insert(did.clone(), sidx);
-                }
-                Statement::Rule(Rule { consequents, .. }) => {
-                    for consequent in consequents {
-                        if let RuleAtom::Construct { did, .. } = consequent {
-                            if let Some(&s_sidx) = lsa.get(did) {
-                                return Some(SealBreak {
-                                    sealed: s_sidx,
-                                    modified: sidx,
-                                    did: did.clone(),
-                                });
-                            }
-                        }
-                    }
-                }
-                Statement::Emit(did) => {
-                    if let Some(&s_sidx) = lsa.get(did) {
-                        return Some(SealBreak {
-                            sealed: s_sidx,
-                            modified: sidx,
-                            did: did.clone(),
-                        });
-                    }
-                }
-                _ => {}
-            }
-        }
-        None
-    }
-
-    /// Returns the set of all declared domains.
-    pub fn declarations(&self) -> HashSet<DomainId> {
-        self.0
-            .iter()
-            .filter_map(|statement| match statement {
-                Statement::Decl(did) | Statement::Defn { did, .. } => Some(did.clone()),
-                _ => None,
-            })
-            .chain(DomainId::PRIMITIVE_STRS.map(String::from).map(DomainId))
-            .collect()
-    }
-}
 
 impl DomainId {
     pub fn is_primitive(&self) -> bool {
@@ -236,31 +191,6 @@ impl DomainId {
     }
 }
 
-impl Statement {
-    /// Returns all domain IDs within. Used to check if all are declared.
-    fn occurring_domain_ids<'a>(&'a self, x: &mut HashSet<&'a DomainId>) {
-        match self {
-            Statement::Defn { did, params } => {
-                x.insert(did);
-                for param in params {
-                    x.insert(param);
-                }
-            }
-            Statement::Decl(did) | Statement::Emit(did) | Statement::Seal(did) => {
-                x.insert(did);
-            }
-            Statement::Rule(..) => {}
-        }
-    }
-}
-impl AnnotatedRule {
-    pub fn consequent_domain_ids(&self) -> impl Iterator<Item = &DomainId> {
-        self.rule
-            .consequents
-            .iter()
-            .map(|consequent| consequent.domain_id(&self.v2d).expect("oh no"))
-    }
-}
 impl Rule {
     fn rule_type_variables(
         &self,

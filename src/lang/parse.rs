@@ -59,44 +59,59 @@ where
 
 ////////////////////////////
 
-pub fn modules(i: &str) -> IResult<&str, Vec<Module>> {
-    many1(module)(i)
+pub fn modules_and_statements(mut i: &str) -> IResult<&str, Vec<Module>> {
+    let mut anon_mod_statements = VecSet::<Statement>::default();
+    let mut modules = vec![];
+    loop {
+        if let Ok((i2, ss)) = statements1(i) {
+            for s in ss {
+                anon_mod_statements.insert(s);
+            }
+            i = i2;
+        } else if let Ok((i2, m)) = module(i) {
+            modules.push(m);
+            i = i2;
+        } else {
+            let anon_module = Module {
+                name: ModuleName("".into()),
+                uses: Default::default(),
+                statements: anon_mod_statements,
+            };
+            modules.push(anon_module);
+            return Ok((i, modules));
+        };
+    }
 }
 
 pub fn module(i: &str) -> IResult<&str, Module> {
     // let uses =
     let (i, (name, maybe_uses, statements)) = tuple((
-        preceded(ws(tag("module")), module_name),
+        preceded(ws(tag("part")), module_name),
         opt(preceded(ws(tag(":")), commasep(module_name))),
-        terminated(preceded(ws(tag("{")), statements), ws(tag("}"))),
+        terminated(preceded(ws(tag("{")), statements0), ws(tag("}"))),
     ))(i)?;
-    Ok((
-        i,
-        Module {
-            name,
-            uses: VecSet::from_vec(maybe_uses.unwrap_or_default()),
-            statements: statements.0.into_iter().collect(),
-        },
-    ))
+    Ok((i, Module { name, uses: VecSet::from_vec(maybe_uses.unwrap_or_default()), statements }))
 }
-
-pub fn statements(i: &str) -> IResult<&str, Statements> {
-    pub fn stmt<'a, F: FnMut(&'a str) -> IResult<&'a str, Statement> + 'a>(
+pub fn like_statements(i: &str) -> IResult<&str, Vec<Statement>> {
+    pub fn stmts1<'a, F: FnMut(&'a str) -> IResult<&'a str, Statement> + 'a>(
         string: &'a str,
         inner: F,
     ) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<Statement>> + 'a {
         preceded(ws(tag(string)), many0(terminated(inner, ws(tag(".")))))
     }
-    let like_statements = alt((
-        stmt("decl", decl),
-        stmt("defn", defn),
-        stmt("seal", seal),
-        stmt("emit", emit),
-        stmt("rule", rule),
-    ));
-    nommap(many0(like_statements), |x: Vec<Vec<Statement>>| {
-        Statements(x.into_iter().flatten().collect())
-    })(i)
+    alt((
+        stmts1("decl", decl),
+        stmts1("defn", defn),
+        stmts1("seal", seal),
+        stmts1("emit", emit),
+        stmts1("rule", rule),
+    ))(i)
+}
+pub fn statements0(i: &str) -> IResult<&str, VecSet<Statement>> {
+    nommap(many0(like_statements), |x| x.into_iter().flatten().collect())(i)
+}
+pub fn statements1(i: &str) -> IResult<&str, VecSet<Statement>> {
+    nommap(many1(like_statements), |x| x.into_iter().flatten().collect())(i)
 }
 
 pub fn decl(i: &str) -> IResult<&str, Statement> {
