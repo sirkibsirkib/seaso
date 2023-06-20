@@ -95,6 +95,7 @@ part leak: sensitive_info_flow, ownership, reads {
     trusts_with(agent,data,agent).
     leak(agent,data,agent).
   rule
+    A1, D, A2 :- trusts_with(A1,D,A2).
     leak(A1,D1,A2) :- ownership(A1,D1), sensitive_info_flow(info_flow(D1,D2)),
                       reads(A2,D2), !trusts_with(A1,D1,A2).
   emit leak. seal leak.
