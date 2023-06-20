@@ -33,11 +33,13 @@ part unl-plan-check: unl-plan {
   defn
     plan-has-third-party(plan).
     input-collision(plan,in,agent,agent).
+    multiple-third-parties(plan,agent,agent).
   rule
     plan-has-third-party(W) :- plan-third-party(W,A).
     input-collision(P,I,A1,A2) :- plan-input(P,A1,I,_), plan-input(P,A2,I,_), !agent-eq(A1,A2).
-  emit input-collision.
-  seal plan-has-third-party. input-collision.
+    multiple-third-parties(P,A1,A2) :- plan-third-party(P,A1), plan-third-party(P,A2), !agent-eq(A1,A2).
+  emit input-collision. multiple-third-parties.
+  seal plan-has-third-party. input-collision. multiple-third-parties.
 }
 
 part info-flow: entities {
@@ -74,8 +76,6 @@ part unl-access: unl-plan, access {
   rule # aggregator-party
     read(access(A,D)) :- aggregator-party(P,A), plan-input(P,_,_,out(D)).
     write(access(A,D)) :- aggregator-party(plan(D),A).
-
-  ## TODO 
 }
 
 part concretize {
@@ -96,4 +96,28 @@ part example {
     plan-input(plan(data("res")), agent("UvA"), in(data("UvA in")), out(data("VU out"))).
     plan-output(plan(data("res")), agent("SURF")).
 
+    # plan-third-party(plan(data("res")), agent("SURF")).
 }
+
+
+<
+- given information produces violations of different forms
+  - simple "syntactic" problems: 
+  - inconsistencies can arise (name clashes in data IDs)
+  - information flow happens but is not permitted
+
+- given program, define the space of candidate extensions
+  - adding permissions
+  - extending the plan (adding a trusted third party)
+  - 
+>
+
+<
+my plan:
+"Christopher will present our view"
+Thomas will give me a slide in explaining what this has to do with the prev meeting
+
+Thomas will introduce:
+- UNL use case
+- what are the relevant AMDEX components
+>
