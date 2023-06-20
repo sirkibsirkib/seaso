@@ -1,0 +1,5 @@
+part tasks: core {
+  defn data-dependency(task,task). 
+  rule
+    T1, T2 :- data-dependency(T1,T2).
+}

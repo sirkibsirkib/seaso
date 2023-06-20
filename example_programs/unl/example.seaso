@@ -1,0 +1,8 @@
+part example: core, task-data {
+	defn agent(str). data(int). task(int).
+	rule
+	  output(task(0),data(2)).
+	  input(task(1),data(2)).
+	  assign(task(1), worker(agent("Big Mike"))).
+}
+<suggested usage: `cat ./task-data.seaso | cargo run --release`>

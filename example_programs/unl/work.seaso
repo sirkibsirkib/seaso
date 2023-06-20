@@ -1,0 +1,7 @@
+part work: core, task-data {
+  defn worker(agent). assign(task,worker).
+  rule
+    A :- worker(A).
+    T, W :- assign(T,W).
+    data-dependency(To,Ti) :- output(To,Do), input(Ti,Di).
+}
