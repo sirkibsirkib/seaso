@@ -1,3 +1,16 @@
-part access: work {
-  defn must-read(agent,data). must-write(agent,data).
+part mode: work {
+  defn mode(str). access(mode,agent,data). must(access).
+  rule
+    mode("read").
+    mode("write").
+    A :- must(A).
+  rule # applicator 
+    must(access(mode("write"),A,D)) :- applicator-result(W,A,D). 
+    must(access(mode("read"), A,D)) :- applicator-result(W,_,D), workflow-aggregator-agent(W,A).
+    must(access(mode("read"), A,D)) :- workflow-data-provider(W,A), workflow-applicator(W,D).
+  rule # aggregator
+    must(access(mode("write"),A,D)) :- aggregator-result(W,D), workflow-aggregator-agent(W,A).
+    must(access(mode("read"), A,D)) :- aggregator-result(W,D), workflow-data-consumer(W,A).
+    must(access(mode("read"), A,D)) :- workflow-aggregator-agent(W,A), workflow-aggregator(W,D).
+  seal mode.
 }

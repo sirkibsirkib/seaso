@@ -1,8 +1,0 @@
-part task-data {
-  defn
-    input(task,data).
-    output(task,data).
-  rule
-	T, D :- input(T,D).
-	T, D :- output(T,D).
-}

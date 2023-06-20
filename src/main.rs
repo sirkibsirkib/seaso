@@ -43,12 +43,17 @@ fn main() -> Result<(), ()> {
 
                     let mp = ModulePreorder::new(&module_map);
                     let ep = ExecutableProgram::new(&module_map);
-                    if let Ok(ep) = ep.as_ref() {
-                        let seal_breaks = mp.iter_breaks(&ep).collect::<HashSet<_>>();
-                        println!("seal_breaks: {:#?}", &seal_breaks);
+                    match ep {
+                        Ok(ep) => {
+                            let seal_breaks = mp.iter_breaks(&ep).collect::<HashSet<_>>();
+                            println!("seal_breaks: {:#?}", &seal_breaks);
 
-                        let denotation = dynamics::Executable::denotation(ep);
-                        println!("denotation: {:#?}", &denotation);
+                            let denotation = dynamics::Executable::denotation(&ep);
+                            println!("denotation: {:#?}", &denotation);
+                        }
+                        Err(e) => {
+                            println!("executable error: {:#?}", e);
+                        }
                     }
                 }
             }

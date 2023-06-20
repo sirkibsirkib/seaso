@@ -1,0 +1,6 @@
+part info-flow: work {
+  defn info-flow(data,data).
+  rule
+    info-flow(D1,D2) :- applicator-result(W,_,D1), aggregator-result(W,D2).
+  seal info-flow.
+}

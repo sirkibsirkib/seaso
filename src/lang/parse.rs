@@ -164,7 +164,7 @@ pub fn string(i: &str) -> IResult<&str, String> {
 }
 
 pub fn module_name(i: &str) -> IResult<&str, ModuleName> {
-    let p = nommap(recognize(many0_count(alphanumeric1)), str::to_owned);
+    let p = nommap(id_suffix, str::to_owned);
     nommap(p, ModuleName)(i)
 }
 

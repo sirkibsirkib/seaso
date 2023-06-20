@@ -16,19 +16,24 @@ part work: core, task-data {
     W, A :- workflow-data-provider(W,A).
     W, A :- workflow-data-consumer(W,A).
     workflow-data-provider(W,A), W, A, D :- applicator-result(W,A,D).
-    workflow-has-third-party(W) :- workflow-third-party(W,A).
-    workflow-aggregator-agent(W,A) :- workflow-third-party(W,A).
-    workflow-aggregator-agent(W,A) :- !workflow-has-third-party(W), workflow-data-consumer(W,A).
+    workflow-has-third-party(W), workflow-aggregator-agent(W,A), W, A 
+    :- workflow-third-party(W,A).
+    workflow-aggregator-agent(W,A), W, A
+    :- !workflow-has-third-party(W), workflow-data-consumer(W,A).
 }
 
-part bad-workflow: workflow {
+part work-checks: work {
   defn 
     multiple-third-parties(workflow,agent,agent).
     applicator-result-collision(workflow,data,agent,agent).
   rule
-    must-write(A,D) :- aggregator-result(W,D), workflow-aggregator-agent(W,A).
-    multiple-third-parties(W,A1,A2), A1, A2, W :- workflow-third-party(W,A1), workflow-third-party(W,A2), !agent-eq(A1,A2).
-    applicator-result-collision(W,D,A1,A2) :- applicator-result(W,A1,D), applicator-result(W,A2,D), !agent-eq(A1,A2).
-  emit multiple-third-parties. applicator-result-collision.
-  seal multiple-third-parties. applicator-result-collision. workflow-has-third-party. aggregator-result
+    multiple-third-parties(W,A1,A2), A1, A2, W
+    :- workflow-third-party(W,A1), workflow-third-party(W,A2), !agent-eq(A1,A2).
+    applicator-result-collision(W,D,A1,A2) 
+    :- applicator-result(W,A1,D), applicator-result(W,A2,D), !agent-eq(A1,A2).
+  emit
+    multiple-third-parties. applicator-result-collision.
+  seal
+    multiple-third-parties. applicator-result-collision.
+    workflow-has-third-party. aggregator-result.
 }

@@ -1,0 +1,5 @@
+part may-access: access {
+  defn may(access). violation(access).
+  rule violation(A) :- must(A), !may(A).
+  emit violation. seal violation.
+}

@@ -1,0 +1,4 @@
+part organization: core {
+  decl organization.
+  defn member-of(agent,organization).
+}
