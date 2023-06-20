@@ -1,0 +1,85 @@
+part entities {
+  decl agent. data.
+  defn agent-eq(agent,agent). data-eq(data,data).
+  rule
+    agent-eq(A,A) :- A.
+    data-eq(D,D) :- D.
+}
+
+part unl-plan {
+  defn in(data). out(data). seal in. out.
+  defn
+    plan(data). # identify by final resulting data
+    plan-app(plan,data).
+    plan-agg(plan,data).
+    plan-input(plan,agent,in,out).
+    plan-output(plan,agent).
+    plan-third-party(plan,agent).
+  rule
+    D :- plan(D).
+    P, D :- plan-app(P,D).
+    P, D :- plan-agg(P,D).
+    P, A, I, O :- plan-input(P,A,in(I),out(O)).
+    P, A :- plan-output(P,A).
+    P, A :- plan-third-party(P,A).
+}
+
+part unl-plan-check: unl-plan {
+  defn
+    plan-some-third-party(plan).
+    input-collision(plan,in,agent,agent).
+  rule
+    plan-some-third-party(W) :- plan-third-party(W,A).
+    input-collision(P,I,A1,A2) :- plan-input(P,A1,I,_), plan-input(P,A2,I,_), !agent-eq(A1,A2).
+  emit input-collision.
+  seal plan-some-third-party. input-collision.
+}
+
+part info-flow: entities {
+  defn info-flow(data,data). param(info-flow). func(info-flow).
+  rule
+    D1,D2 :- info-flow(D1,D2).
+    I :- param(I).
+    I :- func(I).
+}
+
+part access: entities {
+  defn access(agent,data). seal access.
+  defn read(access). write(access).
+  rule
+    A :- read(A).
+    A :- write(A).
+    A, D :- access(A,D).
+}
+
+part unl-info-flow: unl-plan, info-flow {
+  rule
+    param(info-flow(D1,D2)) :- plan-input(P,_,in(D1),out(D2)).
+    param(info-flow(D1,D2)) :- plan-input(plan(D2),_,_,out(D1)).
+    func(info-flow(D1,D2)) :- plan-input(P,_,_,out(D2)), plan-app(P,D1).
+    func(info-flow(D1,D2)) :- plan-agg(plan(D2),D1).
+}
+
+part unl-access: unl-plan, access {
+  rule
+}
+
+part concretize {
+  defn agent(str). data(str).
+}
+
+
+<
+model: partial definitions of plans
+emissions: malformities, insufficient permissions
+search: choice of 3rd parties and additional permissions to minimize emissions
+>
+part example {
+  rule # (partial) plans
+    plan-app(plan(data("res")), data("count students")).
+    plan-agg(plan(data("res")), data("sum counts")).
+    plan-input(plan(data("res")), agent("TUD"), in(data("TUD in")), out(data("TUD out"))).
+    plan-input(plan(data("res")), agent("UvA"), in(data("UvA in")), out(data("VU out"))).
+    plan-output(plan(data("res")), agent("SURF")).
+
+}
