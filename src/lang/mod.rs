@@ -115,8 +115,10 @@ pub struct DomainSealersModifiers {
 pub struct ExecutableProgram {
     pub(crate) dd: DomainDefinitions,
     pub(crate) annotated_rules: Vec<AnnotatedRule>,
-    pub emissive: HashSet<DomainId>,
-    pub sealers_modifiers: HashMap<DomainId, DomainSealersModifiers>,
+    pub(crate) emissive: HashSet<DomainId>,
+    pub(crate) sealers_modifiers: HashMap<DomainId, DomainSealersModifiers>,
+    pub(crate) declared_undefined: HashSet<DomainId>,
+    pub(crate) used_undeclared: HashSet<DomainId>,
 }
 
 pub type SallocKey = u16;

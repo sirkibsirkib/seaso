@@ -31,17 +31,12 @@ pub enum ExecutableRuleError {
 }
 
 #[derive(Debug)]
-pub enum ExecutableError<'a> {
+pub enum ExecutableError {
     DomainDefinitionsError(DomainDefinitionsError),
-    ExecutableRuleError { err: ExecutableRuleError, rule: &'a Rule },
+    ExecutableRuleError(ExecutableRuleError),
 }
 
 //////////////////
-impl From<DomainDefinitionsError> for ExecutableError<'_> {
-    fn from(dde: DomainDefinitionsError) -> Self {
-        Self::DomainDefinitionsError(dde)
-    }
-}
 
 pub fn used_undefined_module_names<'a>(
     module_map: &'a HashMap<&'a ModuleName, &'a Module>,
@@ -104,42 +99,59 @@ impl DomainId {
     pub const PRIMITIVE_STRS: [&str; 2] = ["str", "int"];
 }
 
-// impl From<DomainDefinitionsError> for ExecutableError<'_> {
-//     fn from(e: DomainDefinitionsError) -> Self {
-//         Self::DomainDefinitionsError(e)
-//     }
-// }
-// impl From<ExecutableRuleError> for ExecutableError<'_> {
-//     fn from(e: ExecutableRuleError) -> Self {
-//         Self::ExecutableRuleError(e)
-//     }
-// }
+impl From<DomainDefinitionsError> for ExecutableError {
+    fn from(e: DomainDefinitionsError) -> Self {
+        Self::DomainDefinitionsError(e)
+    }
+}
+impl From<ExecutableRuleError> for ExecutableError {
+    fn from(e: ExecutableRuleError) -> Self {
+        Self::ExecutableRuleError(e)
+    }
+}
 
 fn module_statements<'a>(
     module_map: &'a HashMap<&'a ModuleName, &'a Module>,
-) -> impl Iterator<Item = (&'a ModuleName, &'a Statement)> {
+) -> impl Iterator<Item = (&ModuleName, &Statement)> {
     module_map.iter().flat_map(move |(&module_name, module)| {
         module.statements.iter().map(move |statement| (module_name, statement))
     })
 }
 
 impl ExecutableProgram {
-    pub fn new<'a>(
-        module_map: &'a HashMap<&'a ModuleName, &'a Module>,
-    ) -> Result<Self, ExecutableError<'a>> {
+    pub fn ontology_dot(&self) -> Result<String, std::fmt::Error> {
+        let mut s = String::default();
+        use std::fmt::Write as _;
+        write!(&mut s, "digraph {{\n")?;
+        write!(&mut s, "  node [shape=rect, height=0.1, color=\"red\"];\n")?;
+        write!(&mut s, "  edge [];\n")?;
+        for did in &self.declared_undefined {
+            write!(&mut s, "  {:?} [color=\"blue\"];\n", did)?;
+        }
+        for (did, params) in &self.dd {
+            write!(&mut s, "  {:?} [color=\"green\"];\n", did)?;
+            for param in params {
+                write!(s, "    {:?} -> {:?};\n", did, param)?;
+            }
+        }
+        write!(&mut s, "}}\n")?;
+        Ok(s)
+    }
+    pub fn new(module_map: &HashMap<&ModuleName, &Module>) -> Result<Self, ExecutableError> {
         // pass 1: aggregate definitions
         let dd = Self::domain_definitions(module_statements(module_map).map(snd))?;
 
         let mut annotated_rules = vec![];
         let mut sealers_modifiers = HashMap::<DomainId, DomainSealersModifiers>::default();
         let mut emissive = HashSet::<DomainId>::default();
+        let mut declared_undefined = HashSet::<DomainId>::default();
+        let mut used_undeclared = HashSet::<DomainId>::default();
 
         for (module_name, statement) in module_statements(module_map) {
             match statement {
                 Statement::Rule(rule) => {
-                    let v2d = rule
-                        .rule_type_variables(&dd)
-                        .map_err(|err| ExecutableError::ExecutableRuleError { rule, err })?;
+                    rule.occurring_dids(&mut used_undeclared);
+                    let v2d = rule.rule_type_variables(&dd)?;
                     for did in rule.consequents.iter().map(|x| x.domain_id(&v2d).expect("WAH")) {
                         sealers_modifiers
                             .entry(did.clone())
@@ -150,6 +162,7 @@ impl ExecutableProgram {
                     annotated_rules.push(AnnotatedRule { v2d, rule: rule.clone() })
                 }
                 Statement::Emit(did) => {
+                    used_undeclared.insert(did.clone());
                     sealers_modifiers
                         .entry(did.clone())
                         .or_default()
@@ -158,16 +171,37 @@ impl ExecutableProgram {
                     emissive.insert(did.clone());
                 }
                 Statement::Seal(did) => {
+                    used_undeclared.insert(did.clone());
                     sealers_modifiers
                         .entry(did.clone())
                         .or_default()
                         .sealers
                         .insert(module_name.clone());
                 }
-                _ => {}
+                Statement::Decl(did) => {
+                    used_undeclared.insert(did.clone());
+                    declared_undefined.insert(did.clone());
+                }
+                Statement::Defn { did, params } => {
+                    used_undeclared.insert(did.clone());
+                    for param in params {
+                        used_undeclared.insert(param.clone());
+                    }
+                }
             }
         }
-        Ok(ExecutableProgram { dd, annotated_rules, emissive, sealers_modifiers })
+        declared_undefined.retain(|did| dd.contains_key(did));
+        used_undeclared.retain(|did| {
+            !declared_undefined.contains(did) && !dd.contains_key(did) && !did.is_primitive()
+        });
+        Ok(ExecutableProgram {
+            dd,
+            annotated_rules,
+            emissive,
+            sealers_modifiers,
+            declared_undefined,
+            used_undeclared,
+        })
     }
 
     pub fn domain_definitions<'a>(
@@ -201,14 +235,21 @@ impl DomainId {
 }
 
 impl Rule {
+    fn occurring_dids(&self, dids: &mut HashSet<DomainId>) {
+        for ra in self.rule_atoms() {
+            ra.occurring_dids(dids)
+        }
+    }
+    fn rule_atoms(&self) -> impl Iterator<Item = &RuleAtom> {
+        self.consequents.iter().chain(self.antecedents.iter().map(|lit| &lit.ra))
+    }
     fn rule_type_variables(
         &self,
         dd: &DomainDefinitions,
     ) -> Result<VariableTypes, ExecutableRuleError> {
-        let Self { consequents, antecedents } = self;
         let mut vt = VariableTypes::default();
         let mut vids = HashSet::<VariableId>::default();
-        for ra in consequents.iter().chain(antecedents.iter().map(|lit| &lit.ra)) {
+        for ra in self.rule_atoms() {
             ra.variables(&mut vids);
             if let Err(err) = ra.type_variables(dd, &mut vt) {
                 return Err(err);
@@ -219,7 +260,7 @@ impl Rule {
         } else {
             // enumerability check
             let mut enumerable = HashSet::default();
-            for antecedent in antecedents {
+            for antecedent in &self.antecedents {
                 if let RuleLiteral { sign: Sign::Pos, ra } = antecedent {
                     ra.variables(&mut enumerable);
                 }
@@ -245,6 +286,14 @@ impl Constant {
 }
 
 impl RuleAtom {
+    fn occurring_dids(&self, dids: &mut HashSet<DomainId>) {
+        if let RuleAtom::Construct { did, args } = self {
+            dids.insert(did.clone());
+            for arg in args {
+                arg.occurring_dids(dids)
+            }
+        }
+    }
     pub fn apparent_did(&self) -> Option<&DomainId> {
         match self {
             RuleAtom::Construct { did, .. } => Some(did),

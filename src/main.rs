@@ -45,8 +45,12 @@ fn main() -> Result<(), ()> {
                     let ep = ExecutableProgram::new(&module_map);
                     match ep {
                         Ok(ep) => {
+                            println!("used undeclared: {:?}", &ep.used_undeclared);
+
                             let seal_breaks = mp.iter_breaks(&ep).collect::<HashSet<_>>();
-                            println!("seal_breaks: {:#?}", &seal_breaks);
+                            println!("seal breaks: {:#?}", &seal_breaks);
+
+                            println!("ontology dot:\n{}", ep.ontology_dot().expect("should"));
 
                             let denotation = dynamics::Executable::denotation(&ep);
                             println!("denotation: {:#?}", &denotation);

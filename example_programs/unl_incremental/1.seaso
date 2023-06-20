@@ -1,123 +1,120 @@
 part entities {
   decl agent. data.
-  defn agent-eq(agent,agent). data-eq(data,data).
+  defn agent_eq(agent,agent). data_eq(data,data).
   rule
-    agent-eq(A,A) :- A.
-    data-eq(D,D) :- D.
+    agent_eq(A,A) :- A.
+    data_eq(D,D) :- D.
 }
 
-part unl-plan {
+part unl_plan {
   defn in(data). out(data). seal in. out.
   defn
     plan(data). # identify by final resulting data
-    plan-app(plan,data).
-    plan-agg(plan,data).
-    plan-input(plan,agent,in,out).
-    plan-output(plan,agent).
-    plan-third-party(plan,agent).
-    aggregator-party(plan,agent).
+    plan_app(plan,data).
+    plan_agg(plan,data).
+    plan_input(plan,agent,in,out).
+    plan_output(plan,agent).
+    plan_third_party(plan,agent).
   rule
     D :- plan(D).
-    P, D :- plan-app(P,D).
-    P, D :- plan-agg(P,D).
-    P, A, I, O :- plan-input(P,A,in(I),out(O)).
-    P, A :- plan-output(P,A).
-    P, A :- plan-third-party(P,A).
+    P, D :- plan_app(P,D).
+    P, D :- plan_agg(P,D).
+    P, A, I, O :- plan_input(P,A,in(I),out(O)).
+    P, A :- plan_output(P,A).
+    P, A :- plan_third_party(P,A).
+  defn 
+    aggregator_party(plan,agent).
   rule
-    aggregator-party(P,A) :- plan-output(P,A), !plan-has-third-party(P).
-    aggregator-party(P,A) :- plan-third-party(P,A).
-  seal aggregator-party.
+    aggregator_party(P,A) :- plan_output(P,A), !plan_has_third_party(P).
+    aggregator_party(P,A) :- plan_third_party(P,A).
+  seal aggregator_party.
+  
 }
 
-part unl-plan-check: unl-plan {
+part unl_plan_check: unl_plan {
   defn
-    plan-has-third-party(plan).
-    input-collision(plan,in,agent,agent).
-    multiple-third-parties(plan,agent,agent).
+    plan_has_third_party(plan).
+    input_collision(plan,in,agent,agent).
+    multiple_third_parties(plan,agent,agent).
   rule
-    plan-has-third-party(W) :- plan-third-party(W,A).
-    input-collision(P,I,A1,A2) :- plan-input(P,A1,I,_), plan-input(P,A2,I,_), !agent-eq(A1,A2).
-    multiple-third-parties(P,A1,A2) :- plan-third-party(P,A1), plan-third-party(P,A2), !agent-eq(A1,A2).
-  emit input-collision. multiple-third-parties.
-  seal plan-has-third-party. input-collision. multiple-third-parties.
+    plan_has_third_party(W) :- plan_third_party(W,A).
+    input_collision(P,I,A1,A2) :- plan_input(P,A1,I,_), plan_input(P,A2,I,_), !agent_eq(A1,A2).
+    multiple_third_parties(P,A1,A2) :- plan_third_party(P,A1), plan_third_party(P,A2), !agent_eq(A1,A2).
+  emit input_collision. multiple_third_parties.
+  seal plan_has_third_party. input_collision. multiple_third_parties.
 }
 
-part info-flow: entities {
-  defn info-flow(data,data). param(info-flow). func(info-flow).
+part info_flow: entities {
+  defn info_flow(data,data). param(info_flow). func(info_flow).
   rule
-    D1,D2 :- info-flow(D1,D2).
+    D1,D2 :- info_flow(D1,D2).
     I :- param(I).
     I :- func(I).
 }
 
-part access: entities {
-  defn access(agent,data). seal access.
-  defn read(access). write(access).
+part unl_info_flow: unl_plan, info_flow {
   rule
-    A :- read(A).
-    A :- write(A).
-    A, D :- access(A,D).
+    param(info_flow(D1,D2)) :- plan_input(P,_,in(D1),out(D2)).
+    param(info_flow(D1,D2)) :- plan_input(plan(D2),_,_,out(D1)).
+    func(info_flow(D1,D2)) :- plan_input(P,_,_,out(D2)), plan_app(P,D1).
+    func(info_flow(D1,D2)) :- plan_agg(plan(D2),D1).
 }
 
-part unl-info-flow: unl-plan, info-flow {
+part reads: unl_plan {
+  defn reads(agent,data).
   rule
-    param(info-flow(D1,D2)) :- plan-input(P,_,in(D1),out(D2)).
-    param(info-flow(D1,D2)) :- plan-input(plan(D2),_,_,out(D1)).
-    func(info-flow(D1,D2)) :- plan-input(P,_,_,out(D2)), plan-app(P,D1).
-    func(info-flow(D1,D2)) :- plan-agg(plan(D2),D1).
+    reads(A,D) :- plan_input(_,A,in(D),_).
+    reads(A,D) :- plan_output(plan(D),A).
+    reads(A,D) :- aggregator_party(P,A), plan_input(P,_,_,out(D)).
+  seal reads.
 }
 
-part unl-access: unl-plan, access {
-  rule # university
-    read(access(A,D)) :- plan-input(_,A,in(D),_).
-    write(access(A,D)) :- plan-input(_,A,_,out(D)).
-  rule # consumer
-    read(access(A,D)) :- plan-output(plan(D),A).
-  rule # aggregator-party
-    read(access(A,D)) :- aggregator-party(P,A), plan-input(P,_,_,out(D)).
-    write(access(A,D)) :- aggregator-party(plan(D),A).
+part sensitive_info_flow: unl_info_flow {
+  defn
+    filters_sensitive(data).
+    sensitive_info_flow(info_flow).
+    some_func_not_filters_sensitive(data).
+  rule
+    D :- filters_sensitive(D).
+    I :- sensitive_info_flow(I).
+    some_func_not_filters_sensitive(D2) :- func(info_flow(D1,D2)), !filters_sensitive(D1).
+    sensitive_info_flow(info_flow(D1,D2)) :- param(info_flow(D1,D2)), some_func_not_filters_sensitive(D2).
+    sensitive_info_flow(info_flow(D1,D3))
+    :- sensitive_info_flow(info_flow(D1,D2)), sensitive_info_flow(info_flow(D2,D3)).
+  seal some_func_not_filters_sensitive.
+}
+
+part ownership {
+  defn ownership(agent,data).
+  rule ownership(A,D) :- plan_input(_,A,in(D),_).
+  seal ownership.
+}
+
+part leak: sensitive_info_flow, ownership, reads {
+  defn
+    trusts_with(agent,data,agent).
+    leak(agent,data,agent).
+  rule
+    leak(A1,D1,A2) :- ownership(A1,D1), sensitive_info_flow(info_flow(D1,D2)),
+                      reads(A2,D2), !trusts_with(A1,D1,A2).
+  emit leak. seal leak.
 }
 
 part concretize {
   defn agent(str). data(str).
 }
 
-
-<
-model: partial definitions of plans
-emissions: malformities, insufficient permissions
-search: choice of 3rd parties and additional permissions to minimize emissions
->
 part example {
   rule # (partial) plans
-    plan-app(plan(data("res")), data("count students")).
-    plan-agg(plan(data("res")), data("sum counts")).
-    plan-input(plan(data("res")), agent("TUD"), in(data("TUD in")), out(data("TUD out"))).
-    plan-input(plan(data("res")), agent("UvA"), in(data("UvA in")), out(data("VU out"))).
-    plan-output(plan(data("res")), agent("SURF")).
+    plan_app(plan(data("res")), data("count students")).
+    plan_agg(plan(data("res")), data("sum counts")).
+    plan_input(plan(data("res")), agent("TUD"), in(data("TUD in")), out(data("TUD out"))).
+    plan_input(plan(data("res")), agent("UvA"), in(data("UvA in")), out(data("VU out"))).
+    plan_output(plan(data("res")), agent("VU")).
+    plan_third_party(plan(data("res")), agent("SURF")).
 
-    # plan-third-party(plan(data("res")), agent("SURF")).
+    trusts_with(A,D,agent("SURF")) :- ownership(A,D).
+    filters_sensitive(data("sum counts")).
 }
 
-
-<
-- given information produces violations of different forms
-  - simple "syntactic" problems: 
-  - inconsistencies can arise (name clashes in data IDs)
-  - information flow happens but is not permitted
-
-- given program, define the space of candidate extensions
-  - adding permissions
-  - extending the plan (adding a trusted third party)
-  - 
->
-
-<
-my plan:
-"Christopher will present our view"
-Thomas will give me a slide in explaining what this has to do with the prev meeting
-
-Thomas will introduce:
-- UNL use case
-- what are the relevant AMDEX components
->
+# dot -Kfdp -Tpng .\wop.dot -O
