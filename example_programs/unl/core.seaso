@@ -1,3 +1,7 @@
 part core {
 	decl agent. data. task.
+	defn agent-eq(agent,agent). data-eq(data,data).
+	rule
+	  agent-eq(A,A) :- A.
+      data-eq(D,D) :- D.
 }

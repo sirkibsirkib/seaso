@@ -1,8 +1,8 @@
-part example: core, task-data {
-	defn agent(str). data(int). task(int).
+# suggested usage: `cat ./task-data.seaso | cargo run --release`
+part example: work, task-data {
+	defn agent(str). data(str). workflow(int).
 	rule
-	  output(task(0),data(2)).
-	  input(task(1),data(2)).
-	  assign(task(1), worker(agent("Big Mike"))).
+      applicator-result(workflow(0),agent("UvA"),data("UvA app")).
+      applicator-result(workflow(0),agent("VU"),data("VU app")).
+	  workflow-applicator(workflow(0), data("count users")).
 }
-<suggested usage: `cat ./task-data.seaso | cargo run --release`>

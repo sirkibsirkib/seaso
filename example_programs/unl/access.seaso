@@ -1,0 +1,3 @@
+part access: work {
+  defn must-read(agent,data). must-write(agent,data).
+}
