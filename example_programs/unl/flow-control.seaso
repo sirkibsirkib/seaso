@@ -1,6 +1,0 @@
-part flow-control: info-flow, may-access, organization {
-  defn sensitive-to(data,agent). 
-  rule
-    may(access(K,A,D)) :- must(access(K,A,D)), member-of(A)
-
-}
