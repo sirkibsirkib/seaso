@@ -24,6 +24,23 @@ part unl_plan: entities {
     P, A :- plan_third_party(P,A).
 }
 
+part concretize {
+  defn agent(str). data(str).
+}
+
+part example {
+  rule # (partial) plans
+    plan_app(plan(data("res")), data("count students")).
+    plan_agg(plan(data("res")), data("sum counts")).
+    plan_input(plan(data("res")), agent("TUD"), in(data("TUD in")), out(data("TUD out"))).
+    plan_input(plan(data("res")), agent("UvA"), in(data("UvA in")), out(data("VU out"))).
+    plan_output(plan(data("res")), agent("VU")).
+    plan_third_party(plan(data("res")), agent("SURF")).
+
+    #trusts_with(A,D,agent("SURF")) :- ownership(A,D).
+    #filters_sensitive(data("sum counts")).
+}
+
 part unl_plan_check: unl_plan {
   defn
     aggregator_party(plan,agent).
@@ -95,25 +112,6 @@ part leak: sensitive_info_flow, ownership, reads {
     leak(A1,D1,A2) :- ownership(A1,D1), sensitive_info_flow(info_flow(D1,D2)),
                       reads(A2,D2), !trusts_with(A1,D1,A2).
   emit leak. seal leak.
-}
-
-##################################
-
-part concretize {
-  defn agent(str). data(str).
-}
-
-part example {
-  rule # (partial) plans
-    plan_app(plan(data("res")), data("count students")).
-    plan_agg(plan(data("res")), data("sum counts")).
-    plan_input(plan(data("res")), agent("TUD"), in(data("TUD in")), out(data("TUD out"))).
-    plan_input(plan(data("res")), agent("UvA"), in(data("UvA in")), out(data("VU out"))).
-    plan_output(plan(data("res")), agent("VU")).
-    plan_third_party(plan(data("res")), agent("SURF")).
-
-    trusts_with(A,D,agent("SURF")) :- ownership(A,D).
-    filters_sensitive(data("sum counts")).
 }
 
 # dot -Kfdp -Tpng .\wop.dot -O
