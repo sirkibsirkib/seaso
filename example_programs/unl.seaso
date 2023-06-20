@@ -6,7 +6,7 @@ part entities {
     data_eq(D,D) :- D.
 }
 
-part unl_plan {
+part unl_plan: entities {
   defn in(data). out(data). seal in. out.
   defn
     plan(data). # identify by final resulting data
@@ -22,17 +22,11 @@ part unl_plan {
     P, A, I, O :- plan_input(P,A,in(I),out(O)).
     P, A :- plan_output(P,A).
     P, A :- plan_third_party(P,A).
-  defn 
-    aggregator_party(plan,agent).
-  rule
-    aggregator_party(P,A) :- plan_output(P,A), !plan_has_third_party(P).
-    aggregator_party(P,A) :- plan_third_party(P,A).
-  seal aggregator_party.
-  
 }
 
 part unl_plan_check: unl_plan {
   defn
+    aggregator_party(plan,agent).
     plan_has_third_party(plan).
     input_collision(plan,in,agent,agent).
     multiple_third_parties(plan,agent,agent).
@@ -40,8 +34,10 @@ part unl_plan_check: unl_plan {
     plan_has_third_party(W) :- plan_third_party(W,A).
     input_collision(P,I,A1,A2) :- plan_input(P,A1,I,_), plan_input(P,A2,I,_), !agent_eq(A1,A2).
     multiple_third_parties(P,A1,A2) :- plan_third_party(P,A1), plan_third_party(P,A2), !agent_eq(A1,A2).
+    aggregator_party(P,A) :- plan_output(P,A), !plan_has_third_party(P).
+    aggregator_party(P,A) :- plan_third_party(P,A).
   emit input_collision. multiple_third_parties.
-  seal plan_has_third_party. input_collision. multiple_third_parties.
+  seal plan_has_third_party. input_collision. multiple_third_parties. aggregator_party.
 }
 
 part info_flow: entities {
@@ -100,6 +96,8 @@ part leak: sensitive_info_flow, ownership, reads {
                       reads(A2,D2), !trusts_with(A1,D1,A2).
   emit leak. seal leak.
 }
+
+##################################
 
 part concretize {
   defn agent(str). data(str).

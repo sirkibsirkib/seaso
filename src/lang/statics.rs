@@ -134,6 +134,19 @@ impl ExecutableProgram {
                 write!(s, "    {:?} -> {:?};\n", did, param)?;
             }
         }
+        for ar in &self.annotated_rules {
+            for consequent in &ar.rule.consequents {
+                let did_c = consequent.domain_id(&ar.v2d).expect("whee");
+                for antecedent in &ar.rule.antecedents {
+                    let did_a = antecedent.ra.domain_id(&ar.v2d).expect("whee");
+                    let color_str = match antecedent.sign {
+                        Sign::Pos => "green",
+                        Sign::Neg => "orange",
+                    };
+                    write!(s, "    {:?} -> {:?} [color={:?}];\n", did_c, did_a, color_str)?;
+                }
+            }
+        }
         write!(&mut s, "}}\n")?;
         Ok(s)
     }
