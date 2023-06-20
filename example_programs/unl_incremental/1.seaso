@@ -15,6 +15,7 @@ part unl-plan {
     plan-input(plan,agent,in,out).
     plan-output(plan,agent).
     plan-third-party(plan,agent).
+    aggregator-party(plan,agent).
   rule
     D :- plan(D).
     P, D :- plan-app(P,D).
@@ -22,17 +23,21 @@ part unl-plan {
     P, A, I, O :- plan-input(P,A,in(I),out(O)).
     P, A :- plan-output(P,A).
     P, A :- plan-third-party(P,A).
+  rule
+    aggregator-party(P,A) :- plan-output(P,A), !plan-has-third-party(P).
+    aggregator-party(P,A) :- plan-third-party(P,A).
+  seal aggregator-party.
 }
 
 part unl-plan-check: unl-plan {
   defn
-    plan-some-third-party(plan).
+    plan-has-third-party(plan).
     input-collision(plan,in,agent,agent).
   rule
-    plan-some-third-party(W) :- plan-third-party(W,A).
+    plan-has-third-party(W) :- plan-third-party(W,A).
     input-collision(P,I,A1,A2) :- plan-input(P,A1,I,_), plan-input(P,A2,I,_), !agent-eq(A1,A2).
   emit input-collision.
-  seal plan-some-third-party. input-collision.
+  seal plan-has-third-party. input-collision.
 }
 
 part info-flow: entities {
@@ -61,7 +66,16 @@ part unl-info-flow: unl-plan, info-flow {
 }
 
 part unl-access: unl-plan, access {
-  rule
+  rule # university
+    read(access(A,D)) :- plan-input(_,A,in(D),_).
+    write(access(A,D)) :- plan-input(_,A,_,out(D)).
+  rule # consumer
+    read(access(A,D)) :- plan-output(plan(D),A).
+  rule # aggregator-party
+    read(access(A,D)) :- aggregator-party(P,A), plan-input(P,_,_,out(D)).
+    write(access(A,D)) :- aggregator-party(plan(D),A).
+
+  ## TODO 
 }
 
 part concretize {
