@@ -1,3 +1,4 @@
+use crate::util::fst;
 use crate::*;
 use core::fmt::Debug;
 use std::collections::{HashMap, HashSet};
@@ -168,7 +169,7 @@ impl std::fmt::Debug for Atom {
 
 impl std::fmt::Debug for Knowledge {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let vec_map: HashMap<&DomainId, Vec<_>> = self
+        let mut did_truths: Vec<(&DomainId, Vec<_>)> = self
             .map
             .iter()
             .filter_map(|(did, set)| {
@@ -177,13 +178,14 @@ impl std::fmt::Debug for Knowledge {
                 } else {
                     Some({
                         let mut vec = set.iter().map(super::util::NoPretty).collect::<Vec<_>>();
-                        vec.sort_by_key(|t| t.0);
+                        vec.sort_by_key(|x| x.0);
                         (did, vec)
                     })
                 }
             })
             .collect();
-        f.debug_map().entries(vec_map).finish()
+        did_truths.sort_by_key(|x| x.0);
+        f.debug_map().entries(did_truths).finish()
     }
 }
 

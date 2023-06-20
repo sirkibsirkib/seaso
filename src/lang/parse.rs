@@ -144,7 +144,7 @@ pub fn rule(i: &str) -> IResult<&str, Statement> {
 ////////// (SUB)EXPRESSION-LEVEL PARSERS //////////
 
 pub fn id_suffix(i: &str) -> IResult<&str, &str> {
-    recognize(many0_count(alt((tag("_"), alphanumeric1))))(i)
+    recognize(many0_count(alt((tag("_"), tag("-"), alphanumeric1))))(i)
 }
 
 pub fn domain_id(i: &str) -> IResult<&str, DomainId> {

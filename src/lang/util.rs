@@ -23,6 +23,9 @@ pub struct VecSet<T: Ord> {
 pub fn snd<A, B>((_, b): (A, B)) -> B {
     b
 }
+pub fn fst<A, B>((a, _): (A, B)) -> A {
+    a
+}
 // while this exists, the vecset has a violated invariant
 pub struct VecSetMutGuard<'a, T: Ord> {
     set: &'a mut VecSet<T>,

@@ -19,7 +19,8 @@ fn timed<T>(func: impl FnOnce() -> T) -> (Duration, T) {
 
 fn main() -> Result<(), ()> {
     let source = stdin_to_string().expect("bad stdin");
-    let source = preprocessing::line_comments_removed(source);
+    let source = preprocessing::comments_removed(source);
+    println!("source after preprocessing: <<\n{}\n>>", &source);
 
     let mut parse_result = nom::combinator::all_consuming(parse::modules_and_statements)(&source);
 

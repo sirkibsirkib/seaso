@@ -1,0 +1,19 @@
+defn agent(int). task(str).
+
+defn assign(potential_assignment).
+  potential_assignment(agent,task).
+
+defn unassigned(task). assigned(task).
+
+rule assigned(T) :- assign(potential_assignment(A,T)).
+     A,T :- assign(potential_assignment(A,T)).
+rule unassigned(T) :- T, !assigned(T).
+emit unassigned.
+seal unassigned. assigned.
+
+rule potential_assignment(A,T) :- A,T.
+
+rule agent(3). agent(007).
+rule task("task2"). task("tasl6").
+
+ # [assign, unassigned].
