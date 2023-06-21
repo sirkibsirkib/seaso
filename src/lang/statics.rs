@@ -86,12 +86,17 @@ impl RuleAtom {
                 }
             }
             Self::Construct { did, args } => {
+                if did.is_primitive() {
+                    return self.clone();
+                }
                 return Self::Construct {
                     did: did.clone(),
                     args: args.iter().map(|ra| ra.asp_rewrite(var_rewrites)).collect(),
-                }
+                };
             }
-            _ => {}
+            Self::Constant(c) => {
+                return RuleAtom::Construct { did: c.domain_id().clone(), args: vec![self.clone()] }
+            }
         }
         self.clone()
     }
@@ -110,7 +115,9 @@ impl AnnotatedRule {
             .into_iter()
             .filter_map(|vid| {
                 let did = self.v2d.get(vid).expect("must");
-                let num_params = if let Some(params) = dd.get(did) {
+                let num_params = if did.is_primitive() {
+                    1
+                } else if let Some(params) = dd.get(did) {
                     params.len()
                 } else {
                     // this is all pointless
@@ -163,6 +170,7 @@ impl ExecutableProgram {
                 }
             }
         }
+        write!(&mut s, "\n")?;
 
         // constraints
         for did in &self.emissive {
@@ -178,6 +186,7 @@ impl ExecutableProgram {
                 }
             }
         }
+        write!(&mut s, "\n")?;
 
         // choices
         for (did, params) in self.dd.iter() {
@@ -203,7 +212,7 @@ impl ExecutableProgram {
             }
         }
 
-        Ok(s)
+        Ok(s.replace("!", "not "))
     }
 }
 pub fn used_undefined_module_names<'a>(

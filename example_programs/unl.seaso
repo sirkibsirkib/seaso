@@ -4,6 +4,7 @@ part entities {
   rule
     agent_eq(A,A) :- A.
     data_eq(D,D) :- D.
+  seal agent_eq. data_eq.
 }
 
 part unl_plan: entities {
@@ -60,9 +61,9 @@ part unl_plan_check: unl_plan {
 part info_flow: entities {
   defn info_flow(data,data). param(info_flow). func(info_flow).
   rule
-    D1,D2 :- info_flow(D1,D2).
     I :- param(I).
     I :- func(I).
+  seal info_flow.
 }
 
 part unl_info_flow: unl_plan, info_flow {
@@ -71,6 +72,7 @@ part unl_info_flow: unl_plan, info_flow {
     param(info_flow(D1,D2)) :- plan_input(plan(D2),_,_,out(D1)).
     func(info_flow(D1,D2)) :- plan_input(P,_,_,out(D2)), plan_app(P,D1).
     func(info_flow(D1,D2)) :- plan_agg(plan(D2),D1).
+  seal func. param.
 }
 
 part reads: unl_plan {
@@ -94,7 +96,7 @@ part sensitive_info_flow: unl_info_flow {
     sensitive_info_flow(info_flow(D1,D2)) :- param(info_flow(D1,D2)), some_func_not_filters_sensitive(D2).
     sensitive_info_flow(info_flow(D1,D3))
     :- sensitive_info_flow(info_flow(D1,D2)), sensitive_info_flow(info_flow(D2,D3)).
-  seal some_func_not_filters_sensitive.
+  seal some_func_not_filters_sensitive. sensitive_info_flow.
 }
 
 part ownership {
@@ -112,6 +114,10 @@ part leak: sensitive_info_flow, ownership, reads {
     leak(A1,D1,A2) :- ownership(A1,D1), sensitive_info_flow(info_flow(D1,D2)),
                       reads(A2,D2), !trusts_with(A1,D1,A2).
   emit leak. seal leak.
+}
+
+part search: example {
+  seal plan_input. plan_agg. plan_app. plan_output. plan. agent. data.
 }
 
 # dot -Kfdp -Tpng .\wop.dot -O

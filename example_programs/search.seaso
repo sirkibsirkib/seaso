@@ -7,7 +7,8 @@ defn
  overworked(agent).
  eq(data,data).
 rule
- 1.2.3."A"."B"."C".
+ data(1).data(2).3.agent("A").agent("B"). agent("C").
+ eq(D,D) :- D,D. 
  assigned(D) :- assignment(A,D).
  unassigned(D) :- D, !assigned(D).
  overworked(A) :- assignment(A,D1), assignment(A,D2), !eq(D1,D2).
