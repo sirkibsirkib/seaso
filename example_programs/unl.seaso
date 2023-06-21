@@ -34,7 +34,7 @@ part example {
     plan_agg(plan(data("res")), data("sum counts")).
     plan_input(plan(data("res")), agent("TUD"), in(data("TUD in")), out(data("TUD out"))).
     plan_input(plan(data("res")), agent("UvA"), in(data("UvA in")), out(data("VU out"))).
-    plan_output(plan(data("res")), agent("VU")).
+    plan_output(plan(data("res")), agent("VSNU")).
     plan_third_party(plan(data("res")), agent("SURF")).
 
     #trusts_with(A,D,agent("SURF")) :- ownership(A,D).
