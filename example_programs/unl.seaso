@@ -31,10 +31,10 @@ part concretize {
 
 part example {
   rule # (partial) plans
-    plan_app(plan(data("res")), data("count students")).
-    plan_agg(plan(data("res")), data("sum counts")).
-    plan_input(plan(data("res")), agent("TUD"), in(data("TUD in")), out(data("TUD out"))).
-    plan_input(plan(data("res")), agent("UvA"), in(data("UvA in")), out(data("VU out"))).
+    plan_app(plan(data("res")), data("count-students")).
+    plan_agg(plan(data("res")), data("sum-counts")).
+    plan_input(plan(data("res")), agent("TUD"), in(data("TUD-in")), out(data("TUD-out"))).
+    plan_input(plan(data("res")), agent("UvA"), in(data("UvA-in")), out(data("VU-out"))).
     plan_output(plan(data("res")), agent("VSNU")).
     plan_third_party(plan(data("res")), agent("SURF")).
 

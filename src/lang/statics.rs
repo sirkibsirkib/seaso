@@ -164,7 +164,8 @@ impl ExecutableProgram {
 
         // inference rules
         for ar in &self.annotated_rules {
-            if !ar.rule.consequents.is_empty() {
+            for rule in ar.rule.split_consequents() {
+                let ar = AnnotatedRule { rule, v2d: ar.v2d.clone() };
                 if let Some(ar) = ar.asp_rewrite(&self.dd) {
                     write!(&mut s, "{:?}\n", ar.rule)?;
                 }
@@ -207,10 +208,21 @@ impl ExecutableProgram {
                     .asp_rewrite(&self.dd);
                 if let Some(mut ar) = ar {
                     let consequent = ar.rule.consequents.pop().unwrap();
-                    write!(&mut s, "0{{ {:?} }}1{:?}\n", consequent, ar.rule)?;
+                    let consequent_new = {
+                        match consequent.clone() {
+                            RuleAtom::Construct { did, args } => RuleAtom::Construct {
+                                did: DomainId(format!("__new_{:?}", did)),
+                                args,
+                            },
+                            _ => unreachable!(),
+                        }
+                    };
+                    write!(&mut s, "0{{ {:?} }}1{:?}\n", &consequent_new, ar.rule)?;
+                    write!(&mut s, "{:?} :- {:?}.\n", &consequent, &consequent_new)?;
                 }
             }
         }
+        write!(&mut s, "\n")?;
 
         Ok(s.replace("!", "not "))
     }
@@ -438,6 +450,12 @@ impl DomainId {
 // }
 
 impl Rule {
+    fn split_consequents(&self) -> impl Iterator<Item = Self> + '_ {
+        self.consequents.iter().map(|consequent| Self {
+            consequents: vec![consequent.clone()],
+            antecedents: self.antecedents.clone(),
+        })
+    }
     fn occurring_dids(&self, dids: &mut HashSet<DomainId>) {
         for ra in self.root_atoms() {
             ra.occurring_dids(dids)
