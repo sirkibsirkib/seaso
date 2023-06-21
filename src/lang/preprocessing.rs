@@ -70,7 +70,7 @@ impl NamesVariablesWithContext for RuleAtom {
         match self {
             RuleAtom::Variable(vid) => {
                 if &vid.0 == "_" {
-                    vid.0 = format!("v{}", ava.next);
+                    vid.0 = format!("V{}ANON", ava.next);
                     ava.next += 1
                 }
             }

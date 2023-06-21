@@ -435,19 +435,6 @@ impl DomainId {
         Self::PRIMITIVE_STRS.as_slice().contains(&self.0.as_ref())
     }
 }
-// impl RuleAtom {
-//     fn instantiable(&self, dd: &DomainDefinitions, v2d: &VariableTypes) -> bool {
-//         match self {
-//             Self::Variable(vid) => { let did = v2d.get(vid).expect("bad v2d"); dd.con }
-//         }
-//     }
-// }
-// impl AnnotatedRule {
-
-//     fn instantiable(&self, dd: &DomainDefinitions) -> bool {
-//         self.rule.antecedents.iter().all(|antecedent| antecedent.ra.instantiable(dd,&self.v2d))
-//     }
-// }
 
 impl Rule {
     fn split_consequents(&self) -> impl Iterator<Item = Self> + '_ {
