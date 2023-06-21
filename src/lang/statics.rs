@@ -31,9 +31,9 @@ pub enum ExecutableRuleError {
 }
 
 #[derive(Debug)]
-pub enum ExecutableError {
+pub enum ExecutableError<'a> {
     DomainDefinitionsError(DomainDefinitionsError),
-    ExecutableRuleError(ExecutableRuleError),
+    ExecutableRuleError { rule: &'a Rule, err: ExecutableRuleError },
 }
 
 //////////////////
@@ -288,16 +288,16 @@ impl DomainId {
     pub const PRIMITIVE_STRS: [&str; 2] = ["str", "int"];
 }
 
-impl From<DomainDefinitionsError> for ExecutableError {
+impl From<DomainDefinitionsError> for ExecutableError<'_> {
     fn from(e: DomainDefinitionsError) -> Self {
         Self::DomainDefinitionsError(e)
     }
 }
-impl From<ExecutableRuleError> for ExecutableError {
-    fn from(e: ExecutableRuleError) -> Self {
-        Self::ExecutableRuleError(e)
-    }
-}
+// impl From<ExecutableRuleError> for ExecutableError {
+//     fn from(e: ExecutableRuleError) -> Self {
+//         Self::ExecutableRuleError(e)
+//     }
+// }
 
 fn module_statements<'a>(
     module_map: &'a HashMap<&'a ModuleName, &'a Module>,
@@ -339,7 +339,9 @@ impl ExecutableProgram {
         write!(&mut s, "}}\n")?;
         Ok(s)
     }
-    pub fn new(module_map: &HashMap<&ModuleName, &Module>) -> Result<Self, ExecutableError> {
+    pub fn new<'a>(
+        module_map: &'a HashMap<&'a ModuleName, &'a Module>,
+    ) -> Result<Self, ExecutableError<'a>> {
         // pass 1: aggregate definitions
         let dd = Self::domain_definitions(module_statements(module_map).map(snd))?;
 
@@ -353,7 +355,9 @@ impl ExecutableProgram {
             match statement {
                 Statement::Rule(rule) => {
                     rule.occurring_dids(&mut used_undeclared);
-                    let v2d = rule.rule_type_variables(&dd)?;
+                    let v2d = rule
+                        .rule_type_variables(&dd)
+                        .map_err(|err| ExecutableError::ExecutableRuleError { rule, err })?;
                     for did in rule.consequents.iter().map(|x| x.domain_id(&v2d).expect("WAH")) {
                         sealers_modifiers
                             .entry(did.clone())

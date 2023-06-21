@@ -1,0 +1,28 @@
+part main {
+  defn
+    agent(str). task(int). workflow(int).
+    agent_eq(agent,agent). data_eq(data,data).
+    assign(agent,task). task_in(workflow,task).
+    input(task,data). output(task,data).
+    param(input). func(input).
+    read(agent,data). write(agent,data).
+    transfer(agent,data,agent).
+  rule
+    I :- param(I).
+    I :- func(I).
+    agent_eq(A,A) :- A.
+    data_eq(D,D) :- D.
+    read(A,D) :- assign(A,T), input(T,D).
+    write(A,D) :- assign(A,T), output(T,D).
+    transfer(Aw,T,Ar) :- write(Aw,D), read(Ar,D), !agent_eq(A1,A2).
+  seal param. agent. transfer.
+}
+
+part checks: main {
+  defn dup_write(agent,agent,data). dup_func(task,data,data).
+  rule
+    dup_write(A1,D,A2) :- write(A1,D), write(A2,D), !agent_eq(A1,A2).
+    dup_func(T,D1,D2) :- func(input(T,D1)), func(input(T,D2)), !data_eq(D1,D2).
+  emit dup_write. dup_func.
+  seal dup_write. dup_func.
+}
