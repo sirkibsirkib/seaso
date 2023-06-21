@@ -38,6 +38,174 @@ pub enum ExecutableError {
 
 //////////////////
 
+impl std::fmt::Debug for Rule {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        util::CommaSep { iter: self.consequents.iter(), spaced: true }.fmt(f)?;
+        if !self.antecedents.is_empty() {
+            write!(f, " :- ")?;
+            util::CommaSep { iter: self.antecedents.iter(), spaced: true }.fmt(f)?;
+        }
+        write!(f, ".")
+    }
+}
+
+// impl RuleAtom {
+//     fn asp_print(
+//         &self,
+//         s: &mut String,
+//         v2d: &VariableTypes,
+//         var_rewrites: &HashMap<&VariableId, String>,
+//     ) {
+//         use std::fmt::Write;
+//         match self {
+//             Self::Variable(vid) => match var_rewrites.get(vid) {
+//                 Some(rewrite) => write!(s, "{}", rewrite).unwrap(),
+//                 None => write!(s, "{:?}", self).unwrap(),
+//             },
+//             Self::Constant(c) => write!(s, "{:?}", c).unwrap(),
+
+//             Self::Construct { did, args } => {
+//                 write!(s, "{:?}(", did).unwrap();
+//                 for (i, arg) in args.iter().enumerate() {
+//                     if i > 0 {
+//                         write!(s, ",").unwrap();
+//                     }
+//                     arg.asp_print(s, v2d, var_rewrites);
+//                 }
+//                 write!(s, ")").unwrap();
+//             }
+//         }
+//     }
+// }
+impl RuleAtom {
+    fn asp_rewrite(&self, var_rewrites: &HashMap<&VariableId, RuleAtom>) -> Self {
+        match self {
+            Self::Variable(vid) => {
+                if let Some(ra) = var_rewrites.get(vid) {
+                    return ra.clone();
+                }
+            }
+            Self::Construct { did, args } => {
+                return Self::Construct {
+                    did: did.clone(),
+                    args: args.iter().map(|ra| ra.asp_rewrite(var_rewrites)).collect(),
+                }
+            }
+            _ => {}
+        }
+        self.clone()
+    }
+}
+impl RuleLiteral {
+    fn asp_rewrite(&self, var_rewrites: &HashMap<&VariableId, RuleAtom>) -> Self {
+        Self { sign: self.sign.clone(), ra: self.ra.asp_rewrite(var_rewrites) }
+    }
+}
+impl AnnotatedRule {
+    fn asp_rewrite(&self, dd: &DomainDefinitions) -> Option<Self> {
+        let root_vars = self.rule.root_vars().collect::<HashSet<&VariableId>>();
+
+        let mut uninstantiable = false;
+        let var_rewrites: HashMap<&VariableId, RuleAtom> = root_vars
+            .into_iter()
+            .filter_map(|vid| {
+                let did = self.v2d.get(vid).expect("must");
+                let num_params = if let Some(params) = dd.get(did) {
+                    params.len()
+                } else {
+                    // this is all pointless
+                    uninstantiable = true;
+                    return None;
+                };
+                let args = (0..num_params)
+                    .map(|i| RuleAtom::Variable(VariableId(format!("{:?}{}", vid, i))))
+                    .collect();
+                let ra = RuleAtom::Construct { did: did.clone(), args };
+                Some((vid, ra))
+            })
+            .collect();
+        if uninstantiable {
+            None
+        } else {
+            Some(Self {
+                v2d: self.v2d.clone(),
+                rule: Rule {
+                    consequents: self
+                        .rule
+                        .consequents
+                        .iter()
+                        .map(|ra| ra.asp_rewrite(&var_rewrites))
+                        .collect(),
+                    antecedents: self
+                        .rule
+                        .antecedents
+                        .iter()
+                        .map(|ra| ra.asp_rewrite(&var_rewrites))
+                        .collect(),
+                },
+            })
+        }
+    }
+}
+impl ExecutableProgram {
+    fn is_sealed(&self, did: &DomainId) -> bool {
+        self.sealers_modifiers.get(did).map(|dsm| !dsm.sealers.is_empty()).unwrap_or(false)
+    }
+    pub fn asp_print(&self) -> Result<String, std::fmt::Error> {
+        let mut s = String::default();
+        use std::fmt::Write;
+
+        // inference rules
+        for ar in &self.annotated_rules {
+            if !ar.rule.consequents.is_empty() {
+                if let Some(ar) = ar.asp_rewrite(&self.dd) {
+                    write!(&mut s, "{:?}\n", ar.rule)?;
+                }
+            }
+        }
+
+        // constraints
+        for did in &self.emissive {
+            if let Some(_) = self.dd.get(did) {
+                let vid = VariableId("V".into());
+                let v2d: VariableTypes = Some((vid.clone(), did.clone())).into_iter().collect();
+                let rule = Rule {
+                    consequents: vec![],
+                    antecedents: vec![RuleLiteral { sign: Sign::Pos, ra: RuleAtom::Variable(vid) }],
+                };
+                if let Some(ar) = (AnnotatedRule { v2d, rule }).asp_rewrite(&self.dd) {
+                    write!(&mut s, "{:?}\n", ar.rule)?;
+                }
+            }
+        }
+
+        // choices
+        for (did, params) in self.dd.iter() {
+            if !self.is_sealed(did) {
+                let mut v2d = VariableTypes::default();
+                let mut args = vec![];
+                let mut antecedents = vec![];
+                for (i, param) in params.iter().enumerate() {
+                    let vid = VariableId(format!("V{}", i));
+                    let ra = RuleAtom::Variable(vid.clone());
+                    let rl = RuleLiteral { sign: Sign::Pos, ra: ra.clone() };
+                    v2d.insert(vid, param.clone());
+                    args.push(ra);
+                    antecedents.push(rl);
+                }
+                let consequents = vec![RuleAtom::Construct { did: did.clone(), args }];
+                let ar = AnnotatedRule { v2d, rule: Rule { consequents, antecedents } }
+                    .asp_rewrite(&self.dd);
+                if let Some(mut ar) = ar {
+                    let consequent = ar.rule.consequents.pop().unwrap();
+                    write!(&mut s, "0{{ {:?} }}1{:?}\n", consequent, ar.rule)?;
+                }
+            }
+        }
+
+        Ok(s)
+    }
+}
 pub fn used_undefined_module_names<'a>(
     module_map: &'a HashMap<&'a ModuleName, &'a Module>,
 ) -> impl Iterator<Item = &ModuleName> {
@@ -246,14 +414,33 @@ impl DomainId {
         Self::PRIMITIVE_STRS.as_slice().contains(&self.0.as_ref())
     }
 }
+// impl RuleAtom {
+//     fn instantiable(&self, dd: &DomainDefinitions, v2d: &VariableTypes) -> bool {
+//         match self {
+//             Self::Variable(vid) => { let did = v2d.get(vid).expect("bad v2d"); dd.con }
+//         }
+//     }
+// }
+// impl AnnotatedRule {
+
+//     fn instantiable(&self, dd: &DomainDefinitions) -> bool {
+//         self.rule.antecedents.iter().all(|antecedent| antecedent.ra.instantiable(dd,&self.v2d))
+//     }
+// }
 
 impl Rule {
     fn occurring_dids(&self, dids: &mut HashSet<DomainId>) {
-        for ra in self.rule_atoms() {
+        for ra in self.root_atoms() {
             ra.occurring_dids(dids)
         }
     }
-    fn rule_atoms(&self) -> impl Iterator<Item = &RuleAtom> {
+    fn root_vars(&self) -> impl Iterator<Item = &VariableId> {
+        self.root_atoms().filter_map(|ra| match ra {
+            RuleAtom::Variable(vid) => Some(vid),
+            _ => None,
+        })
+    }
+    fn root_atoms(&self) -> impl Iterator<Item = &RuleAtom> {
         self.consequents.iter().chain(self.antecedents.iter().map(|lit| &lit.ra))
     }
     fn rule_type_variables(
@@ -262,7 +449,7 @@ impl Rule {
     ) -> Result<VariableTypes, ExecutableRuleError> {
         let mut vt = VariableTypes::default();
         let mut vids = HashSet::<VariableId>::default();
-        for ra in self.rule_atoms() {
+        for ra in self.root_atoms() {
             ra.variables(&mut vids);
             if let Err(err) = ra.type_variables(dd, &mut vt) {
                 return Err(err);

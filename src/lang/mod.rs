@@ -10,11 +10,14 @@ pub mod statics;
 /// Dynamics of Seaso, implementing methods and defining types needed to compute the denotation of a checked program.`
 pub mod dynamics;
 
-pub mod search;
+// pub mod search;
 
 pub mod util;
 
+mod table;
+
 use crate::lang::util::VecSet;
+use core::marker::PhantomData;
 use std::collections::{HashMap, HashSet};
 
 /////////////////////////////////////////////
@@ -79,7 +82,7 @@ pub struct ModulePreorder<'a> {
 }
 
 /// A logical implication rule with N conjunctive consequents and N conjunctive antecedents.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Rule {
     pub consequents: Vec<RuleAtom>,
     pub antecedents: Vec<RuleLiteral>,
@@ -121,9 +124,14 @@ pub struct ExecutableProgram {
     pub(crate) used_undeclared: HashSet<DomainId>,
 }
 
-pub type SallocKey = u16;
-pub struct StringAlloc {
-    string_index: HashMap<String, SallocKey>,
-    strings: Vec<String>,
-    next_key: SallocKey,
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct Index<T> {
+    data: u16,
+    _phantom: PhantomData<T>,
 }
+
+// #[derive(Default)]
+// pub struct Table<T: Clone> {
+//     index_to_t: Vec<T>,
+//     t_to_index: HashMap<T, Index<T>>,
+// }

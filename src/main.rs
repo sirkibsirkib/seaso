@@ -50,6 +50,8 @@ fn main() -> Result<(), ()> {
                             let seal_breaks = mp.iter_breaks(&ep).collect::<HashSet<_>>();
                             println!("seal breaks: {:#?}", &seal_breaks);
 
+                            println!("asp print:\n{}", ep.asp_print().expect("ok"));
+
                             println!("ontology dot:\n{}", ep.ontology_dot().expect("should"));
 
                             let denotation = dynamics::Executable::denotation(&ep);

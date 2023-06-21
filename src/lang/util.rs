@@ -66,9 +66,6 @@ impl<T: Ord> VecSet<T> {
         elements.dedup();
         Self { elements }
     }
-    pub fn elements(&self) -> &Vec<T> {
-        &self.elements
-    }
     pub fn insert(&mut self, t: T) -> Option<T> {
         match self.elements.binary_search(&t) {
             Ok(idx) => {
@@ -181,25 +178,5 @@ impl Debug for Constant {
 impl Debug for VariableId {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{}", &self.0)
-    }
-}
-
-impl StringAlloc {
-    pub fn add_string(&mut self, string: &str) -> SallocKey {
-        if let Some(&k) = self.string_index.get(string) {
-            return k;
-        } else {
-            let this_key = self.next_key;
-            let new_next: SallocKey = self.next_key.checked_add(1).expect("ran out of keys!");
-            self.next_key = new_next;
-            self.string_index.insert(string.to_owned(), this_key);
-            this_key
-        }
-    }
-    pub fn get_string(&self, key: SallocKey) -> Option<&str> {
-        self.strings.get(key as usize).map(String::as_str)
-    }
-    pub fn get_key(&self, string: &str) -> Option<SallocKey> {
-        self.string_index.get(string).copied()
     }
 }

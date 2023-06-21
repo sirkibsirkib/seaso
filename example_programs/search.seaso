@@ -1,0 +1,16 @@
+defn
+ agent(str).
+ data(int).
+ assignment(agent,data).
+ assigned(data).
+ unassigned(data).
+ overworked(agent).
+ eq(data,data).
+rule
+ 1.2.3."A"."B"."C".
+ assigned(D) :- assignment(A,D).
+ unassigned(D) :- D, !assigned(D).
+ overworked(A) :- assignment(A,D1), assignment(A,D2), !eq(D1,D2).
+emit unassigned. overworked.
+seal assigned. unassigned. overworked. eq.
+
