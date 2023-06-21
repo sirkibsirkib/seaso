@@ -1,28 +1,47 @@
 part main {
   defn
     agent(str). task(int). workflow(int).
-    agent_eq(agent,agent). data_eq(data,data).
+    agent_eq(agent,agent). data_eq(data,data). task_eq(task,task).
     assign(agent,task). task_in(workflow,task).
     input(task,data). output(task,data).
     param(input). func(input).
     read(agent,data). write(agent,data).
     transfer(agent,data,agent).
+    dep(task,data,task).
   rule
     I :- param(I).
     I :- func(I).
     agent_eq(A,A) :- A.
+    task_eq(T,T) :- T.
     data_eq(D,D) :- D.
+    A, T :- assign(A,T).
+    T, D :- input(T,D).
+    T, D :- output(T,D).
+    A, D :- write(A,D).
+    A, D :- read(A,D).
     read(A,D) :- assign(A,T), input(T,D).
     write(A,D) :- assign(A,T), output(T,D).
-    transfer(Aw,T,Ar) :- write(Aw,D), read(Ar,D), !agent_eq(A1,A2).
-  seal param. agent. transfer.
+    dep(T1,D,T2) :- output(T1,D), input(T2,D).
+    transfer(Aw,D,Ar) :- write(Aw,D), read(Ar,D), !agent_eq(Aw,Ar).
+    
+  seal input. agent. transfer. read. write. dep.
 }
 
 part checks: main {
-  defn dup_write(agent,agent,data). dup_func(task,data,data).
+  defn dup_write(agent,agent,data). dup_func(task,data,data). dup_output(task,task,data).
   rule
-    dup_write(A1,D,A2) :- write(A1,D), write(A2,D), !agent_eq(A1,A2).
+    dup_write(A1,A2,D) :- write(A1,D), write(A2,D), !agent_eq(A1,A2).
     dup_func(T,D1,D2) :- func(input(T,D1)), func(input(T,D2)), !data_eq(D1,D2).
+    dup_output(T1,T2,D) :- output(T1,D), output(T2,D), !task_eq(T1,T2).
   emit dup_write. dup_func.
   seal dup_write. dup_func.
+}
+
+part norms: main {
+  
+}
+
+part example: main {
+    rule 
+    seal workflow.
 }
