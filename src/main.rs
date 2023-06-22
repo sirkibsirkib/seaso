@@ -15,6 +15,7 @@ struct Config {
     asp: bool,
     source: bool,
     denotation: bool,
+    ast: bool,
 }
 
 impl Config {
@@ -25,6 +26,7 @@ impl Config {
             dot: get("--dot"),
             asp: get("--asp"),
             denotation: get("--denotation"),
+            ast: get("--ast"),
         }
     }
 }
@@ -39,7 +41,9 @@ fn main() -> Result<(), ()> {
     let mut parse_result = nom::combinator::all_consuming(parse::modules_and_statements)(&source);
     match &mut parse_result {
         Ok((_, modules)) => {
-            // println!("modules: {:#?}", modules);
+            if config.ast {
+                println!("ast: {:#?}", modules);
+            }
             for module in modules.iter_mut() {
                 preprocessing::NamesVariables::name_variables(module)
             }

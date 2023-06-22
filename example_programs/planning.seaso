@@ -1,6 +1,6 @@
 part entities {
+  decl agent. data. task.
   defn
-    agent(str). task(int). data(int).
     agent_eq(agent,agent). data_eq(data,data). task_eq(task,task).
   rule
     agent_eq(A,A) :- A.
@@ -13,11 +13,19 @@ part task-data: entities {
   defn 
     output(task,data).
     input(task,data). param(task,data). func(task,data).
+    task_data_dep(task,data,task).
+    task_dep_t(task,task).
+    cyclic(task).
   rule
     T, D :- input(T,D).
     T, D :- output(T,D).
     input(T,D) :- param(T,D).
     input(T,D) :- func(T,D).
+    task_dep_t(Ti,To), task_data_dep(Ti,D,To) :- input(Ti,D), output(To,D).
+    task_dep_t(Tx,Tz) :- task_dep_t(Tx,Ty), task_dep_t(Ty,Tz).
+    cyclic(T) :- task_dep_t(T,T).
+  emit cyclic.
+  seal input. task_dep_t. cyclic. task_data_dep.
 }
 
 part agent-data: entities {
@@ -25,11 +33,27 @@ part agent-data: entities {
     read(agent,data).
     write(agent,data).
     transfer(agent,data,agent).
-    dep(task,data,task).
+    transfer_t(agent,data,agent).
+    gets(agent,data).
+    given(agent,data).
+    outputs(agent,data).
+    impossible_transfer(agent,data,agent).
+    impossible_read(agent,data).
+    cyclic_transfer(agent,data).
   rule
     A, D :- write(A,D).
     A, D :- read(A,D).
-    dep(T1,D,T2) :- output(T1,D), input(T2,D).
+    outputs(A,D) :- output(T,D), assign(A,T).
+    gets(A,D) :- given(A,D).
+    gets(A2,D) :- transfer(A1,D,A2).
+    gets(A,D) :- outputs(A,D).
+    transfer_t(A1,D,A2) :- transfer(A1,D,A2).
+    transfer_t(A1,D,A3) :- transfer_t(A1,D,A2), transfer_t(A2,D,A3).
+    cyclic_transfer(A,D) :- transfer_t(A,D,A).
+    impossible_transfer(A1,D,A2) :- transfer(A1,D,A2), !gets(A1,D).
+    impossible_read(A,D) :- read(A,D), !gets(A,D).
+  emit impossible_transfer. impossible_read. cyclic_transfer.
+  seal impossible_transfer. impossible_read. transfer_t. gets. outputs. cyclic_transfer.
 }
 
 part planning: entities {
@@ -46,24 +70,79 @@ part connection: planning, agent-data, task-data {
   rule
     read(A,D) :- assign(A,T), input(T,D).
     write(A,D) :- assign(A,T), output(T,D).
-    transfer(Aw,D,Ar) :- write(Aw,D), read(Ar,D), !agent_eq(Aw,Ar).
+  seal write. read.
 }
 
 part checks: connection {
-  defn dup_write(agent,agent,data). dup_func(task,data,data). dup_output(task,task,data).
+  defn
+    dup_func(task,data,data).
+    dup_output(task,task,data).
   rule
-    dup_write(A1,A2,D) :- write(A1,D), write(A2,D), !agent_eq(A1,A2).
     dup_func(T,D1,D2) :- func(T,D1), func(T,D2), !data_eq(D1,D2).
     dup_output(T1,T2,D) :- output(T1,D), output(T2,D), !task_eq(T1,T2).
-  emit dup_write. dup_func. dup_output.
-  seal dup_write. dup_func. dup_output.
+  emit dup_func. dup_output.
+  seal dup_func. dup_output.
 }
 
-part example: connection {
+part resource: connection {
+  defn
+    overworked(agent).
+    network_link(agent,agent).
+    unlinked_transfer(agent,data,agent).
+    transferred_twice(agent,data).
   rule
-    agent("Amy"). agent("Bob"). agent("Dan").
-    param (task(0),data(0)).
-    output(task(0),data(1)).
-    param (task(1),data(1)).
-  seal func. param. output. task. data. agent.
+    overworked(A) :- assign(A,T1), assign(A,T2), !task_eq(T1,T2).
+    unlinked_transfer(A1,T,A2) :- transfer(A1,T,A2), !network_link(A1,A2).
+  emit overworked. unlinked_transfer.
+  seal overworked. unlinked_transfer. transferred_twice.
+}
+
+part concrete: connection {
+  defn agent(str). task(int). data(str).
+}
+
+part may_not_get: connection {
+  defn may_not_get(agent,data). bad_get(agent,data). private(agent,data).
+  rule
+    bad_get(A,D) :- may_not_get(A,D), gets(A,D).
+    may_not_get(A2,D) :- private(A1,D), A2, !agent_eq(A1,A2).
+  emit bad_get. seal bad_get.
+}
+
+part example: concrete {
+  rule
+    agent("Amy"). agent("Bob"). agent("Cam"). agent("Dan"). agent("Eli").
+
+    given(agent("Amy"),data("X")).
+    given(agent("Amy"),data("Y")).
+    given(agent("Dan"),data("F")).
+    given(agent("Dan"),data("G")).
+
+    func  (task(0),data("F")).
+    param (task(0),data("X")).
+    output(task(0),data("FX")).
+
+    func  (task(1),data("F")).
+    param (task(1),data("Y")).
+    output(task(1),data("FY")).
+
+    func  (task(2),data("G")).
+    param (task(2),data("FX")).
+    param (task(2),data("FY")).
+    output(task(2),data("GFXFX")).
+
+    param (task(3),data("GFXFX")).
+    assign(agent("Dan"), task(3)).
+
+    may_not_get(agent("Dan"),data("Y")).
+    private(agent("Amy"),data("X")).
+    may_not_get(agent("Bob"),data("Z")).
+
+
+    network_link(A1, A2) :- A1, A2.
+  seal
+    func. param. output. task. data.
+    agent. task_eq. data_eq. agent_eq.
+    given. network_link. important.
+    may_not_get.
 }
