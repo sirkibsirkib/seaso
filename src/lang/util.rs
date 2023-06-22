@@ -20,11 +20,11 @@ pub struct VecSet<T: Ord> {
     elements: Vec<T>,
 }
 
-#[derive(Default)]
-pub struct Timer {
-    start_instants: Vec<(&'static str, Instant)>,
-    durations: Vec<(&'static str, Duration)>,
-}
+// #[derive(Default)]
+// pub struct Timer {
+//     start_instants: Vec<(&'static str, Instant)>,
+//     durations: Vec<(&'static str, Duration)>,
+// }
 
 // while this exists, the vecset has a violated invariant
 pub struct VecSetMutGuard<'a, T: Ord> {
