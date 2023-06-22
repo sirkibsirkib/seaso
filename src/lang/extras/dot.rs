@@ -1,6 +1,9 @@
 use crate::*;
 impl ExecutableProgram {
-    pub fn ontology_dot(&self) -> Result<String, std::fmt::Error> {
+    pub fn ontology_dot(&self) -> String {
+        self.ontology_dot_inner().expect("String write cannot fail")
+    }
+    fn ontology_dot_inner(&self) -> Result<String, std::fmt::Error> {
         let mut s = String::default();
         use std::fmt::Write as _;
         write!(&mut s, "digraph {{\n")?;

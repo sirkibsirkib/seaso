@@ -117,7 +117,7 @@ part leak: sensitive_info_flow, ownership, reads {
 }
 
 part search: example {
-  seal plan_input. plan_agg. plan_app. plan_output. plan. agent. data.
+  seal plan_input. plan_agg. plan_app. plan_output. plan. agent. data. func. agent_eq. data_eq.
 }
 
 # dot -Kfdp -Tpng .\wop.dot -O

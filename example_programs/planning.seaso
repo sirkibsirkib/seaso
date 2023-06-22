@@ -1,59 +1,69 @@
-part main {
+part entities {
   defn
     agent(str). task(int). data(int).
     agent_eq(agent,agent). data_eq(data,data). task_eq(task,task).
-    assign(agent,task).
-    input(task,data). output(task,data).
-    param(task,data). func(task,data).
-    read(agent,data). write(agent,data).
-    transfer(agent,data,agent).
-    dep(task,data,task).
   rule
     agent_eq(A,A) :- A.
     task_eq(T,T) :- T.
     data_eq(D,D) :- D.
-    A, T :- assign(A,T).
-    T, D :- input(T,D).
-    T, D :- output(T,D).
-    A, D :- write(A,D).
-    A, D :- read(A,D).
-    input(T,D) :- param(T,D).
-    input(T,D) :- func(T,D).
-    read(A,D) :- assign(A,T), input(T,D).
-    write(A,D) :- assign(A,T), output(T,D).
-    dep(T1,D,T2) :- output(T1,D), input(T2,D).
-    transfer(Aw,D,Ar) :- write(Aw,D), read(Ar,D), !agent_eq(Aw,Ar).
-    
-  seal input. agent. transfer. read. write. dep.
+  # note: `eq` variants are unsealed!
 }
 
-part checks: main {
+part task-data: entities {
+  defn 
+    output(task,data).
+    input(task,data). param(task,data). func(task,data).
+  rule
+    T, D :- input(T,D).
+    T, D :- output(T,D).
+    input(T,D) :- param(T,D).
+    input(T,D) :- func(T,D).
+}
+
+part agent-data: entities {
+  defn 
+    read(agent,data).
+    write(agent,data).
+    transfer(agent,data,agent).
+    dep(task,data,task).
+  rule
+    A, D :- write(A,D).
+    A, D :- read(A,D).
+    dep(T1,D,T2) :- output(T1,D), input(T2,D).
+}
+
+part planning: entities {
+  defn assign(agent,task). assigned(task). unassigned(task).
+  rule
+    A, T :- assign(A,T).
+    assigned(T) :- assign(A,T).
+    unassigned(T) :- T, !assigned(T).
+  emit unassigned.
+  seal assigned. unassigned.
+}
+
+part connection: planning, agent-data, task-data {
+  rule
+    read(A,D) :- assign(A,T), input(T,D).
+    write(A,D) :- assign(A,T), output(T,D).
+    transfer(Aw,D,Ar) :- write(Aw,D), read(Ar,D), !agent_eq(Aw,Ar).
+}
+
+part checks: connection {
   defn dup_write(agent,agent,data). dup_func(task,data,data). dup_output(task,task,data).
   rule
     dup_write(A1,A2,D) :- write(A1,D), write(A2,D), !agent_eq(A1,A2).
     dup_func(T,D1,D2) :- func(T,D1), func(T,D2), !data_eq(D1,D2).
     dup_output(T1,T2,D) :- output(T1,D), output(T2,D), !task_eq(T1,T2).
-  emit dup_write. dup_func.
-  seal dup_write. dup_func.
+  emit dup_write. dup_func. dup_output.
+  seal dup_write. dup_func. dup_output.
 }
 
-part planning: main {
-  defn assigned(task). unassigned(task).
-  rule assigned(T) :- assign(A,T).
-  rule unassigned(T) :- T, !assigned(T).
-  emit unassigned.
-  seal assigned. unassigned.
-}
-
-part norms: main {
-  
-}
-
-part example: main {
+part example: connection {
   rule
     agent("Amy"). agent("Bob"). agent("Dan").
-    param(task(0),data(0)).
+    param (task(0),data(0)).
     output(task(0),data(1)).
-    param(task(1),data(1)).
-  seal workflow. func. param. output. task_in. workflow.
+    param (task(1),data(1)).
+  seal func. param. output. task. data. agent.
 }

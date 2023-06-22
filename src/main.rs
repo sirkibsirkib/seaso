@@ -10,14 +10,36 @@ fn stdin_to_string() -> Result<String, std::io::Error> {
     Ok(buffer)
 }
 
+struct Config {
+    dot: bool,
+    asp: bool,
+    source: bool,
+    denotation: bool,
+}
+
+impl Config {
+    fn new() -> Self {
+        let get = |s1| std::env::args().find(|s2| s1 == s2).is_some();
+        Self {
+            source: get("--source"),
+            dot: get("--dot"),
+            asp: get("--asp"),
+            denotation: get("--denotation"),
+        }
+    }
+}
+
 fn main() -> Result<(), ()> {
+    let config = Config::new();
     let source = stdin_to_string().expect("bad stdin");
     let source = preprocessing::comments_removed(source);
-    println!("source after preprocessing: <<\n{}\n>>", &source);
+    if config.source {
+        println!("source after preprocessing: <<\n{}\n>>", &source);
+    }
     let mut parse_result = nom::combinator::all_consuming(parse::modules_and_statements)(&source);
     match &mut parse_result {
         Ok((_, modules)) => {
-            println!("modules: {:#?}", modules);
+            // println!("modules: {:#?}", modules);
             for module in modules.iter_mut() {
                 preprocessing::NamesVariables::name_variables(module)
             }
@@ -34,10 +56,18 @@ fn main() -> Result<(), ()> {
                             let mp = statics::ModulePreorder::new(&module_map);
                             let seal_breaks = mp.iter_breaks(&ep).collect::<HashSet<_>>();
                             println!("seal breaks: {:#?}", &seal_breaks);
-                            println!("asp print:\n{}", ep.asp_print().expect("ok"));
-                            println!("ontology dot:\n{}", ep.ontology_dot().expect("should"));
-                            let denotation = dynamics::Executable::denotation(&ep);
-                            println!("denotation: {:#?}", &denotation);
+                            if config.asp {
+                                println!("asp print:\n{}", ep.asp_print());
+                            }
+                            if config.dot {
+                                println!("ontology dot:\n{}", ep.ontology_dot());
+                            }
+                            if config.denotation {
+                                println!(
+                                    "denotation: {:#?}",
+                                    dynamics::Executable::denotation(&ep)
+                                );
+                            }
                         }
                         Err(e) => println!("executable error: {:#?}", e),
                     }

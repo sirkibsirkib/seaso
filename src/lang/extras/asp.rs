@@ -1,7 +1,10 @@
 use crate::*;
 use std::collections::HashMap;
+
+type VarRewrites<'a> = HashMap<&'a VariableId, RuleAtom>;
+
 impl RuleAtom {
-    fn asp_rewrite(&self, var_rewrites: &HashMap<&VariableId, RuleAtom>) -> Self {
+    fn asp_rewrite(&self, var_rewrites: &VarRewrites) -> Self {
         match self {
             Self::Variable(vid) => {
                 if let Some(ra) = var_rewrites.get(vid) {
@@ -25,7 +28,7 @@ impl RuleAtom {
     }
 }
 impl RuleLiteral {
-    fn asp_rewrite(&self, var_rewrites: &HashMap<&VariableId, RuleAtom>) -> Self {
+    fn asp_rewrite(&self, var_rewrites: &VarRewrites) -> Self {
         Self { sign: self.sign.clone(), ra: self.ra.asp_rewrite(var_rewrites) }
     }
 }
@@ -78,7 +81,10 @@ impl AnnotatedRule {
     }
 }
 impl ExecutableProgram {
-    pub fn asp_print(&self) -> Result<String, std::fmt::Error> {
+    pub fn asp_print(&self) -> String {
+        self.asp_print_inner().expect("string write cannot fail")
+    }
+    fn asp_print_inner(&self) -> Result<String, std::fmt::Error> {
         let mut s = String::default();
         use std::fmt::Write;
 
