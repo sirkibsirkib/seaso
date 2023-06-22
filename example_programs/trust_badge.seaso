@@ -1,28 +1,26 @@
-
-  decl user. email. agreement. data. purpose.
-  defn has_email    (agreement,user).
-    signed          (agreement,user).
-    must_ask_purpose(agreement,user).
-    needs_some      (agreement,user).
-    badged          (agreement,user).
-  defn asks(agreement,user,data,purpose).
-    gives  (agreement,user,data,purpose).
-    needs  (agreement,user,data,purpose).
-  defn user_email(agreement,user,email). 
-    agreement_data(agreement,data).
-    purpose_subsumes(purpose,purpose).
-    asks_some_purpose(agreement,user,data).
-    data_owner(user,data).
-  rule has_email(A,U) :- user_email(A,U,E).
-    asks_some_purpose(A,U,D) :- asks(A,U,D,P).
-    purpose_subsumes(P1,P3) :- purpose_subsumes(P1,P2), purpose_subsumes(P2,P3).
-    gives(A,U,D,P2) :- purpose_subsumes(P1,P2), gives(A,U,D,P1).
-    needs_some(A,U1), needs(A,U1,D,P) :- asks(A,U1,D,P), !gives(A,U2,D,P), data_owner(U2,D).
-    must_ask_purpose(A,U) :- signed(A,U), agreement_data(A,D), !asks_some_purpose(A,U,D).
-    badged(A,U) 
-    :- signed(A,U)
-    ,  has_email(A,U)
-    , !must_ask_purpose(A,U)
-    , !needs_some(A,U).
-  seal needs_some. needs.
-
+decl user. email. agreement. data. purpose.
+defn has_email    (agreement,user).
+  signed          (agreement,user).
+  must_ask_purpose(agreement,user).
+  needs_some      (agreement,user).
+  badged          (agreement,user).
+defn asks(agreement,user,data,purpose).
+  gives  (agreement,user,data,purpose).
+  needs  (agreement,user,data,purpose).
+defn user_email(agreement,user,email). 
+  agreement_data(agreement,data).
+  purpose_subsumes(purpose,purpose).
+  asks_some_purpose(agreement,user,data).
+  data_owner(user,data).
+rule has_email(A,U) :- user_email(A,U,E).
+  asks_some_purpose(A,U,D) :- asks(A,U,D,P).
+  purpose_subsumes(P1,P3) :- purpose_subsumes(P1,P2), purpose_subsumes(P2,P3).
+  gives(A,U,D,P2) :- purpose_subsumes(P1,P2), gives(A,U,D,P1).
+  needs_some(A,U1), needs(A,U1,D,P) :- asks(A,U1,D,P), !gives(A,U2,D,P), data_owner(U2,D).
+  must_ask_purpose(A,U) :- signed(A,U), agreement_data(A,D), !asks_some_purpose(A,U,D).
+  badged(A,U) 
+  :- signed(A,U)
+  ,  has_email(A,U)
+  , !must_ask_purpose(A,U)
+  , !needs_some(A,U).
+seal needs_some. needs.
