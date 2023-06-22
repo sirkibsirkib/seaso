@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{statics::Module, *};
 
 pub struct AnonVariableAllocator {
     next: u32,

@@ -1,5 +1,5 @@
 use crate::lang::VecSet;
-use crate::*;
+use crate::{statics::Module, *};
 use nom::{
     branch::alt,
     bytes::complete::tag,

@@ -30,18 +30,16 @@ fn main() -> Result<(), ()> {
             for module in modules.iter_mut() {
                 preprocessing::NamesVariables::name_variables(module)
             }
-            let module_map_result =
-                util::collect_map_lossless(modules.iter().map(|module| (&module.name, module)));
+            let module_map_result = statics::ModuleMap::new(modules.iter());
             match module_map_result {
                 Err(clashing_name) => {
                     println!("clashing module name: {:?}", clashing_name)
                 }
                 Ok(module_map) => {
-                    let uumn =
-                        statics::used_undefined_module_names(&module_map).collect::<HashSet<_>>();
+                    let uumn = module_map.used_undefined_names().collect::<HashSet<_>>();
                     println!("used_undefined_module: {:#?}", uumn);
 
-                    let mp = ModulePreorder::new(&module_map);
+                    let mp = statics::ModulePreorder::new(&module_map);
                     let ep = ExecutableProgram::new(&module_map);
                     match ep {
                         Ok(ep) => {

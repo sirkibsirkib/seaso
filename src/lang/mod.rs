@@ -14,10 +14,9 @@ pub mod dynamics;
 
 pub mod util;
 
-mod table;
+mod extras;
 
 use crate::lang::util::VecSet;
-use core::marker::PhantomData;
 use std::collections::{HashMap, HashSet};
 
 /////////////////////////////////////////////
@@ -68,19 +67,6 @@ pub enum Statement {
     Emit(DomainId),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub struct ModuleName(pub String);
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct Module {
-    pub name: ModuleName,
-    pub uses: VecSet<ModuleName>,
-    pub statements: VecSet<Statement>,
-}
-pub struct ModulePreorder<'a> {
-    edges: HashSet<[&'a ModuleName; 2]>,
-}
-
 /// A logical implication rule with N conjunctive consequents and N conjunctive antecedents.
 #[derive(Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Rule {
@@ -108,6 +94,9 @@ pub struct AnnotatedRule {
     pub rule: Rule,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct ModuleName(pub String);
+
 #[derive(Debug, Default)]
 pub struct DomainSealersModifiers {
     sealers: HashSet<ModuleName>,
@@ -123,15 +112,3 @@ pub struct ExecutableProgram {
     pub(crate) declared_undefined: HashSet<DomainId>,
     pub(crate) used_undeclared: HashSet<DomainId>,
 }
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct Index<T> {
-    data: u16,
-    _phantom: PhantomData<T>,
-}
-
-// #[derive(Default)]
-// pub struct Table<T: Clone> {
-//     index_to_t: Vec<T>,
-//     t_to_index: HashMap<T, Index<T>>,
-// }
