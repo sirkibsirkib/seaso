@@ -181,18 +181,17 @@ impl ExecutableProgram {
                         .insert(module_name.clone());
                 }
                 Statement::Decl(did) => {
-                    used_undeclared.insert(did.clone());
                     declared_undefined.insert(did.clone());
                 }
-                Statement::Defn { did, params } => {
-                    used_undeclared.insert(did.clone());
+                Statement::Defn { params, .. } => {
+                    // did a definition pass earlier
                     for param in params {
                         used_undeclared.insert(param.clone());
                     }
                 }
             }
         }
-        declared_undefined.retain(|did| dd.contains_key(did));
+        declared_undefined.retain(|did| !dd.contains_key(did));
         used_undeclared.retain(|did| {
             !declared_undefined.contains(did) && !dd.contains_key(did) && !did.is_primitive()
         });

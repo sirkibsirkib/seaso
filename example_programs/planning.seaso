@@ -143,6 +143,6 @@ part example: concrete {
   seal
     func. param. output. task. data.
     agent. task_eq. data_eq. agent_eq.
-    given. network_link. important.
+    given. network_link.
     may_not_get.
 }
