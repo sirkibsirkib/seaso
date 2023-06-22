@@ -53,17 +53,6 @@ pub enum ExecutableError<'a> {
 
 //////////////////
 
-impl std::fmt::Debug for Rule {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        util::CommaSep { iter: self.consequents.iter(), spaced: true }.fmt(f)?;
-        if !self.antecedents.is_empty() {
-            write!(f, " :- ")?;
-            util::CommaSep { iter: self.antecedents.iter(), spaced: true }.fmt(f)?;
-        }
-        write!(f, ".")
-    }
-}
-
 impl<'a> ModuleMap<'a> {
     pub fn new(modules: impl IntoIterator<Item = &'a Module>) -> Result<Self, &'a ModuleName> {
         let map =
@@ -379,5 +368,16 @@ impl RuleAtom {
             RuleAtom::Variable(vid) => vt.get(vid).ok_or(()),
             RuleAtom::Constant(c) => Ok(c.domain_id()),
         }
+    }
+}
+
+impl std::fmt::Debug for Rule {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        util::CommaSep { iter: self.consequents.iter(), spaced: true }.fmt(f)?;
+        if !self.antecedents.is_empty() {
+            write!(f, " :- ")?;
+            util::CommaSep { iter: self.antecedents.iter(), spaced: true }.fmt(f)?;
+        }
+        write!(f, ".")
     }
 }

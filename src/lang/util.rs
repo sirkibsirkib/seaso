@@ -20,8 +20,10 @@ pub struct VecSet<T: Ord> {
     elements: Vec<T>,
 }
 
-pub fn snd<A, B>((_, b): (A, B)) -> B {
-    b
+#[derive(Default)]
+pub struct Timer {
+    start_instants: Vec<(&'static str, Instant)>,
+    durations: Vec<(&'static str, Duration)>,
 }
 
 // while this exists, the vecset has a violated invariant
@@ -30,6 +32,11 @@ pub struct VecSetMutGuard<'a, T: Ord> {
 }
 
 /////////////////////////
+
+pub fn snd<A, B>((_, b): (A, B)) -> B {
+    b
+}
+
 pub fn collect_map_lossless<K: Copy + Eq + Hash, V, I: IntoIterator<Item = (K, V)>>(
     iter: I,
 ) -> Result<HashMap<K, V>, K> {

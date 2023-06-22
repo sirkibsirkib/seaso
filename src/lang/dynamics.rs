@@ -148,46 +148,6 @@ impl ComplementKnowledge<'_> {
     }
 }
 
-impl std::fmt::Debug for Atom {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::Constant { c } => match c {
-                Constant::Int(c) => c.fmt(f),
-                Constant::Str(c) => c.fmt(f),
-            },
-            Self::Construct { did, args } => {
-                let mut f = f.debug_tuple(&did.0);
-                for arg in args {
-                    f.field(arg);
-                }
-                f.finish()
-            }
-        }
-    }
-}
-
-impl std::fmt::Debug for Knowledge {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut did_truths: Vec<(&DomainId, Vec<_>)> = self
-            .map
-            .iter()
-            .filter_map(|(did, set)| {
-                if set.is_empty() {
-                    None
-                } else {
-                    Some({
-                        let mut vec = set.iter().map(super::util::NoPretty).collect::<Vec<_>>();
-                        vec.sort_by_key(|x| x.0);
-                        (did, vec)
-                    })
-                }
-            })
-            .collect();
-        did_truths.sort_by_key(|x| x.0);
-        f.debug_map().entries(did_truths).finish()
-    }
-}
-
 impl VariableAssignments {
     fn get_state_token(&self) -> StateToken {
         StateToken { assignments_count: self.assignments.len() }
@@ -356,5 +316,45 @@ impl Rule {
                 Sign::Neg => self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail),
             },
         }
+    }
+}
+
+impl std::fmt::Debug for Atom {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Constant { c } => match c {
+                Constant::Int(c) => c.fmt(f),
+                Constant::Str(c) => c.fmt(f),
+            },
+            Self::Construct { did, args } => {
+                let mut f = f.debug_tuple(&did.0);
+                for arg in args {
+                    f.field(arg);
+                }
+                f.finish()
+            }
+        }
+    }
+}
+
+impl std::fmt::Debug for Knowledge {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut did_truths: Vec<(&DomainId, Vec<_>)> = self
+            .map
+            .iter()
+            .filter_map(|(did, set)| {
+                if set.is_empty() {
+                    None
+                } else {
+                    Some({
+                        let mut vec = set.iter().map(super::util::NoPretty).collect::<Vec<_>>();
+                        vec.sort_by_key(|x| x.0);
+                        (did, vec)
+                    })
+                }
+            })
+            .collect();
+        did_truths.sort_by_key(|x| x.0);
+        f.debug_map().entries(did_truths).finish()
     }
 }
