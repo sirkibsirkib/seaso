@@ -1,3 +1,5 @@
+{upedas(au)m(au)k(audp)g(audp)l(aue)f(ad)c(pp)o(ud)@n(audp)@$z(au)$q(aud)$h(au)$b(au)[h(AU)|l(AUE)][q(AUD)|k(AUDP)][c(PR)|c(PQ)c(QR)][g(AUDQ)|c(PQ)g(AUDP)][z(AU)n(AUDP)|k(AUDP)-g(AVDP)o(VD)][m(AU)|s(AU)f(AD)-q(AUD)][b(AU)|s(AU)h(AU)-m(AU)-z(AU)]}m
+
 decl user. email. agreement. data. purpose.
 defn has_email    (agreement,user).
   signed          (agreement,user).
@@ -24,4 +26,50 @@ rule has_email(A,U) :- user_email(A,U,E).
   , !must_ask_purpose(A,U)
   , !needs_some(A,U).
 seal needs_some. needs.
-same a = b.
+
+u`ser e`mail a`greement d`ata p`urpose
+<h`as_email a u><s`ignedd a u><m`ust_ask_purpose a u>
+<n`eeded a u><b`adged a u><ask a u d p><give a u d p>
+<some_needed >
+
+{
+	x
+}foo
+{
+	f^oo.x=x
+	q(p,r)
+	$a*b$c
+	[x]-x
+	*q()
+	=qf.q
+}bar
+
+{
+	$p`lan u`ser t`ask t
+	<a`ssign t u>
+	$<as`signed t>
+	<eq`user u u>
+	$!<un`assigned t>
+	[un T] +T -as T
+	[eq U U] +U
+}main
+
+{
+	{
+
+	}bong
+	p
+	[+p T]+T
+}foo
+
+{
+
+	}bing
+
+{
+	main.p = foo.p
+
+	<q t>
+	[q T] +p T
+
+}bar

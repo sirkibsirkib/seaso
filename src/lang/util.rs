@@ -151,6 +151,7 @@ impl Debug for RuleLiteral {
 impl Debug for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
+            Statement::Same { a, b } => write!(f, "same {:?} = {:?}", a, b),
             Statement::Rule(Rule { consequents, antecedents }) => {
                 write!(f, "rule {:?}", CommaSep { iter: consequents, spaced: true })?;
                 if !antecedents.is_empty() {

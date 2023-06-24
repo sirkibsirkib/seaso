@@ -105,6 +105,7 @@ pub fn like_statements(i: &str) -> IResult<&str, Vec<Statement>> {
         stmts1("seal", seal),
         stmts1("emit", emit),
         stmts1("rule", rule),
+        stmts1("same", same),
     ))(i)
 }
 pub fn statements0(i: &str) -> IResult<&str, VecSet<Statement>> {
@@ -123,6 +124,10 @@ pub fn emit(i: &str) -> IResult<&str, Statement> {
 
 pub fn seal(i: &str) -> IResult<&str, Statement> {
     nommap(domain_id, Statement::Seal)(i)
+}
+pub fn same(i: &str) -> IResult<&str, Statement> {
+    let p = pair(ws(domain_id), preceded(ws(tag("=")), ws(domain_id)));
+    nommap(p, |(a, b)| Statement::Same { a, b })(i)
 }
 
 pub fn defn(i: &str) -> IResult<&str, Statement> {

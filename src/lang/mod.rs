@@ -65,6 +65,7 @@ pub enum Statement {
     Rule(Rule),
     Seal(DomainId),
     Emit(DomainId),
+    Same { a: DomainId, b: DomainId },
 }
 
 /// A logical implication rule with N conjunctive consequents and N conjunctive antecedents.
@@ -103,6 +104,16 @@ pub struct DomainSealersModifiers {
     modifiers: HashSet<ModuleName>,
 }
 
+pub struct EqClasser<T> {
+    edges: Vec<[T; 2]>,
+}
+
+#[derive(Debug)]
+pub struct EqClasses<T> {
+    representatives: HashMap<T, T>,
+    representative_members: HashMap<T, HashSet<T>>,
+}
+
 #[derive(Debug)]
 pub struct ExecutableProgram {
     pub(crate) dd: DomainDefinitions,
@@ -111,4 +122,5 @@ pub struct ExecutableProgram {
     pub(crate) sealers_modifiers: HashMap<DomainId, DomainSealersModifiers>,
     pub(crate) declared_undefined: HashSet<DomainId>,
     pub(crate) used_undeclared: HashSet<DomainId>,
+    pub(crate) domain_eq_classes: EqClasses<DomainId>,
 }

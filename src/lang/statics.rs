@@ -1,6 +1,6 @@
-use crate::lang::util::snd;
 use crate::lang::VecSet;
 use crate::*;
+use core::hash::Hash;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -30,12 +30,6 @@ pub struct SealBreak<'a> {
 }
 
 #[derive(Debug)]
-pub enum DomainDefinitionsError {
-    ConflictingDefinitions { did: DomainId, params: [Vec<DomainId>; 2] },
-    DefiningPrimitive(DomainId),
-}
-
-#[derive(Debug)]
 pub enum ExecutableRuleError {
     OneVariableTwoTypes { vid: VariableId, domains: [DomainId; 2] },
     MistypedArgument { constructor: DomainId, expected: DomainId, got: DomainId },
@@ -47,11 +41,30 @@ pub enum ExecutableRuleError {
 
 #[derive(Debug)]
 pub enum ExecutableError<'a> {
-    DomainDefinitionsError(DomainDefinitionsError),
-    ExecutableRuleError { rule: &'a Rule, err: ExecutableRuleError },
+    ConflictingDefinitions {
+        module_name: &'a ModuleName,
+        did: DomainId,
+        params: [Vec<DomainId>; 2],
+    },
+    DefiningPrimitive {
+        module_name: &'a ModuleName,
+        did: DomainId,
+        params: &'a [DomainId],
+    },
+    ExecutableRuleError {
+        module_name: &'a ModuleName,
+        rule: &'a Rule,
+        err: ExecutableRuleError,
+    },
 }
 
 //////////////////
+
+impl<T> Default for EqClasser<T> {
+    fn default() -> Self {
+        Self { edges: Default::default() }
+    }
+}
 
 impl<'a> ModuleMap<'a> {
     pub fn new(modules: impl IntoIterator<Item = &'a Module>) -> Result<Self, &'a ModuleName> {
@@ -120,12 +133,6 @@ impl DomainId {
     }
 }
 
-impl From<DomainDefinitionsError> for ExecutableError<'_> {
-    fn from(e: DomainDefinitionsError) -> Self {
-        Self::DomainDefinitionsError(e)
-    }
-}
-
 impl ExecutableProgram {
     fn module_statements<'a>(
         module_map: &'a ModuleMap<'a>,
@@ -138,22 +145,51 @@ impl ExecutableProgram {
         self.sealers_modifiers.get(did).map(|dsm| !dsm.sealers.is_empty()).unwrap_or(false)
     }
     pub fn new<'a>(module_map: &'a ModuleMap<'a>) -> Result<Self, ExecutableError<'a>> {
-        // pass 1: aggregate definitions
-        let dd = Self::domain_definitions(Self::module_statements(module_map).map(snd))?;
+        // pass 1: domain definitions and domain equalities
+        let mut dd = DomainDefinitions::default();
+        let mut domain_eq_classer = EqClasser::<DomainId>::default();
+        for (module_name, statement) in Self::module_statements(module_map) {
+            match statement {
+                Statement::Same { a, b } => {
+                    domain_eq_classer.add(a.clone(), b.clone());
+                }
+                Statement::Defn { did, params } => {
+                    if did.is_primitive() {
+                        return Err(ExecutableError::DefiningPrimitive {
+                            module_name,
+                            did: did.clone(),
+                            params,
+                        });
+                    }
+                    let prev = dd.insert(did.clone(), params.clone());
+                    if let Some(previous_params) = prev {
+                        if &previous_params != params {
+                            return Err(ExecutableError::ConflictingDefinitions {
+                                module_name,
+                                did: did.clone(),
+                                params: [previous_params, params.clone()],
+                            });
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        let domain_eq_classes = domain_eq_classer.to_equivalence_classes();
 
+        // pass 2: everything else
         let mut annotated_rules = vec![];
         let mut sealers_modifiers = HashMap::<DomainId, DomainSealersModifiers>::default();
         let mut emissive = HashSet::<DomainId>::default();
-        let mut declared_undefined = HashSet::<DomainId>::default();
-        let mut used_undeclared = HashSet::<DomainId>::default();
-
+        let mut declared = HashSet::<DomainId>::default();
+        let mut used = HashSet::<DomainId>::default();
         for (module_name, statement) in Self::module_statements(module_map) {
             match statement {
                 Statement::Rule(rule) => {
-                    rule.occurring_dids(&mut used_undeclared);
-                    let v2d = rule
-                        .rule_type_variables(&dd)
-                        .map_err(|err| ExecutableError::ExecutableRuleError { rule, err })?;
+                    rule.occurring_dids(&mut used);
+                    let v2d = rule.rule_type_variables(&dd).map_err(|err| {
+                        ExecutableError::ExecutableRuleError { module_name, rule, err }
+                    })?;
                     for did in rule.consequents.iter().map(|x| x.domain_id(&v2d).expect("WAH")) {
                         sealers_modifiers
                             .entry(did.clone())
@@ -164,7 +200,7 @@ impl ExecutableProgram {
                     annotated_rules.push(AnnotatedRule { v2d, rule: rule.clone() })
                 }
                 Statement::Emit(did) => {
-                    used_undeclared.insert(did.clone());
+                    used.insert(did.clone());
                     sealers_modifiers
                         .entry(did.clone())
                         .or_default()
@@ -173,7 +209,7 @@ impl ExecutableProgram {
                     emissive.insert(did.clone());
                 }
                 Statement::Seal(did) => {
-                    used_undeclared.insert(did.clone());
+                    used.insert(did.clone());
                     sealers_modifiers
                         .entry(did.clone())
                         .or_default()
@@ -181,20 +217,23 @@ impl ExecutableProgram {
                         .insert(module_name.clone());
                 }
                 Statement::Decl(did) => {
-                    declared_undefined.insert(did.clone());
+                    declared.insert(did.clone());
+                }
+                Statement::Same { a, b } => {
+                    declared.insert(a.clone());
+                    declared.insert(b.clone());
                 }
                 Statement::Defn { params, .. } => {
                     // did a definition pass earlier
                     for param in params {
-                        used_undeclared.insert(param.clone());
+                        used.insert(param.clone());
                     }
                 }
             }
         }
-        declared_undefined.retain(|did| !dd.contains_key(did));
-        used_undeclared.retain(|did| {
-            !declared_undefined.contains(did) && !dd.contains_key(did) && !did.is_primitive()
-        });
+        let used_undeclared =
+            used.into_iter().filter(|did| !declared.contains(did) && !did.is_primitive()).collect();
+        let declared_undefined = declared.into_iter().filter(|did| !dd.contains_key(did)).collect();
         Ok(ExecutableProgram {
             dd,
             annotated_rules,
@@ -202,30 +241,8 @@ impl ExecutableProgram {
             sealers_modifiers,
             declared_undefined,
             used_undeclared,
+            domain_eq_classes,
         })
-    }
-
-    pub fn domain_definitions<'a>(
-        statements: impl Iterator<Item = &'a Statement>,
-    ) -> Result<DomainDefinitions, DomainDefinitionsError> {
-        let mut dd = DomainDefinitions::default();
-        for statement in statements {
-            if let Statement::Defn { did, params } = statement {
-                if did.is_primitive() {
-                    return Err(DomainDefinitionsError::DefiningPrimitive(did.clone()));
-                }
-                let prev = dd.insert(did.clone(), params.clone());
-                if let Some(previous_params) = prev {
-                    if &previous_params != params {
-                        return Err(DomainDefinitionsError::ConflictingDefinitions {
-                            did: did.clone(),
-                            params: [previous_params, params.clone()],
-                        });
-                    }
-                }
-            }
-        }
-        Ok(dd)
     }
 }
 
@@ -289,6 +306,45 @@ impl Constant {
             Self::Int { .. } => LAZY_INT.get_or_init(|| DomainId("int".to_owned())),
             Self::Str { .. } => LAZY_STR.get_or_init(|| DomainId("str".to_owned())),
         }
+    }
+}
+
+impl<T: Ord + Hash + Clone> EqClasser<T> {
+    pub fn add(&mut self, a: T, b: T) {
+        use core::cmp::Ordering;
+        self.edges.push(match a.cmp(&b) {
+            Ordering::Less => [a, b],
+            Ordering::Greater => [b, a],
+            Ordering::Equal => return,
+        })
+    }
+    pub fn to_equivalence_classes(mut self) -> EqClasses<T> {
+        let mut representatives = HashMap::<T, T>::default();
+        self.edges.sort();
+        self.edges.dedup();
+        for [a, b] in self.edges {
+            // a < b
+            let representative =
+                representatives.get(&a).or(representatives.get(&b)).unwrap_or(&a).clone();
+            representatives.insert(a, representative.clone());
+            representatives.insert(b, representative);
+        }
+        let mut representative_members = HashMap::<T, HashSet<T>>::default();
+        for (member, representative) in &representatives {
+            representative_members
+                .entry(representative.clone())
+                .or_default()
+                .insert(member.clone());
+        }
+        EqClasses { representatives, representative_members }
+    }
+}
+impl<T: Eq + Hash> EqClasses<T> {
+    pub fn representative<'a>(&'a self, t: &'a T) -> &'a T {
+        self.representatives.get(t).unwrap_or(t)
+    }
+    pub fn representative_members(&self, t: &T) -> Option<&HashSet<T>> {
+        self.representative_members.get(t)
     }
 }
 
