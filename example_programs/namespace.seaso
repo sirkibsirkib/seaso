@@ -1,8 +1,11 @@
-part main {
-	decl int=p=q. q=r.
-	defn a(r).
+part one {
+	defn a(i).
 }
-part y {
-	decl a = main@x.
+part two {
 	rule a(2).
 }
+part three {
+	decl i=int.
+}
+decl a = a@one = a@two.
+     i = i@one = i@three.

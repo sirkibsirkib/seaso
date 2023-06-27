@@ -106,7 +106,7 @@ pub struct DomainSealersModifiers {
 #[derive(Debug)]
 pub struct EqClasses {
     representatives: HashMap<DomainId, DomainId>,
-    representative_members: HashMap<DomainId, HashSet<DomainId>>,
+    representative_members: HashMap<DomainId, Vec<DomainId>>,
 }
 
 #[derive(Debug)]

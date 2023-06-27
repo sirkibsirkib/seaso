@@ -27,10 +27,6 @@ pub struct VecSetMutGuard<'a, T: Ord> {
 
 /////////////////////////
 
-pub fn snd<A, B>((_, b): (A, B)) -> B {
-    b
-}
-
 pub fn collect_map_lossless<K: Copy + Eq + Hash, V, I: IntoIterator<Item = (K, V)>>(
     iter: I,
 ) -> Result<HashMap<K, V>, K> {
@@ -86,7 +82,10 @@ impl<T: Ord> VecSet<T> {
         VecSetMutGuard { set: self }
     }
     pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.elements.iter()
+        self.as_vec().iter()
+    }
+    pub fn as_vec(&self) -> &Vec<T> {
+        &self.elements
     }
 }
 impl<'a, T: Ord> AsMut<Vec<T>> for VecSetMutGuard<'a, T> {

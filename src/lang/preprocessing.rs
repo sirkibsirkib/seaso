@@ -1,3 +1,4 @@
+use crate::lang::VecSet;
 use crate::{statics::Module, *};
 use core::cmp::Ordering;
 use std::collections::HashMap;
@@ -6,47 +7,93 @@ trait VisitMut<T> {
     fn visit_mut<F: FnMut(&mut T)>(&mut self, f: &mut F);
 }
 
-pub struct EqClasser {
-    // invariant: strictly descending order WRT `Self::better_did`
-    edges: Vec<[DomainId; 2]>,
+pub struct EqDomainIdGraph<'a> {
+    sorted_dir_edges: VecSet<[&'a DomainId; 2]>,
 }
 
 #[derive(Debug)]
-pub struct EquateIntStrErr {
-    eq_class: HashSet<DomainId>,
+pub struct EquatePrimitivesError<'a> {
+    pub eq_class: &'a Vec<DomainId>,
 }
 
 ////////////////
-pub fn equate_domain_ids(modules: &mut [Module]) -> Result<EqClasses, EquateIntStrErr> {
-    // step 1: extract equivalence classes
-    let mut eq_classer = EqClasser { edges: vec![] };
-    for module in modules.iter_mut() {
-        for statement in module.statements.iter() {
-            if let Statement::Decl(vec) = statement {
-                for slice in vec.windows(2) {
-                    if let [a, b] = slice {
-                        eq_classer.add(a.clone(), b.clone());
-                    } else {
-                        unreachable!()
-                    }
-                }
-            }
-        }
-    }
-    let eq_classes = eq_classer.to_equivalence_classes()?;
-    // step 2: rename dids
+pub fn normalize_domain_id_formatting(modules: &mut [Module], global: bool) {
     for module in modules.iter_mut() {
         let mut guard = module.statements.as_vec_mut();
         for statement in guard.as_mut().iter_mut() {
             let mut clos = |did: &mut DomainId| {
-                if let Some(representative) = eq_classes.get_representative(did) {
-                    *did = representative.clone();
+                if did.is_primitive() {
+                    return;
+                }
+                did.0.retain(|c| !c.is_whitespace());
+                if module.name.0 != "" && !global && !did.0.contains("@") {
+                    did.0.push_str("@");
+                    did.0.push_str(&module.name.0);
                 }
             };
             statement.visit_mut(&mut clos);
         }
     }
-    Ok(eq_classes)
+}
+
+impl Default for EqDomainIdGraph<'_> {
+    fn default() -> Self {
+        Self { sorted_dir_edges: Default::default() }
+    }
+}
+impl<'a> EqDomainIdGraph<'a> {
+    fn insert(&mut self, a: &'a DomainId, b: &'a DomainId) {
+        if a != b {
+            self.sorted_dir_edges.insert([a, b]);
+            self.sorted_dir_edges.insert([b, a]);
+        }
+    }
+    fn out_edges(&'a self, did: &'a DomainId) -> impl Iterator<Item = &'a DomainId> + 'a {
+        self.sorted_dir_edges.iter().filter(move |[from, _]| *from == did).map(|[_from, to]| *to)
+    }
+    fn dfs(&self, at: &DomainId, unmarked: &mut HashSet<&DomainId>, cluster: &mut Vec<DomainId>) {
+        if unmarked.remove(at) {
+            cluster.push(at.clone());
+            for next in self.out_edges(at) {
+                self.dfs(next, unmarked, cluster)
+            }
+        }
+    }
+    fn to_equivalence_classes(self) -> EqClasses {
+        // collect all verts
+        let mut unmarked = HashSet::default();
+        for [a, b] in self.sorted_dir_edges.iter() {
+            unmarked.insert(*a);
+            unmarked.insert(*b);
+        }
+
+        // compute member -> representative
+        let mut representative_members = HashMap::<DomainId, Vec<DomainId>>::default();
+        while let Some(did) = unmarked.iter().next() {
+            let mut cluster = vec![];
+            self.dfs(did, &mut unmarked, &mut cluster);
+            fn cmp(a: &DomainId, b: &DomainId) -> Ordering {
+                match [a.is_primitive(), b.is_primitive()] {
+                    [true, false] => Ordering::Less,
+                    [false, true] => Ordering::Greater,
+                    _ => a.0.len().cmp(&b.0.len()).then_with(|| a.0.cmp(&b.0)),
+                }
+            }
+            cluster.sort_by(cmp);
+            let representative = cluster.first().unwrap().clone();
+            representative_members.insert(representative, cluster);
+        }
+        // compute representative -> {member}
+        let representatives: HashMap<DomainId, DomainId> = representative_members
+            .iter()
+            .flat_map(|(representative, members)| {
+                members.iter().map(move |member| (member.clone(), representative.clone()))
+            })
+            .collect();
+
+        // done!
+        EqClasses { representatives, representative_members }
+    }
 }
 
 pub fn deanonymize_variables(modules: &mut [Module]) {
@@ -160,61 +207,59 @@ pub fn comments_removed(mut s: String) -> String {
     s
 }
 
-impl EqClasser {
-    fn add(&mut self, a: DomainId, b: DomainId) {
-        self.edges.push(match Self::better_did(&a, &b) {
-            Ordering::Less => [a, b],
-            Ordering::Greater => [b, a],
-            Ordering::Equal => return,
-        })
-    }
-    fn to_equivalence_classes(mut self) -> Result<EqClasses, EquateIntStrErr> {
-        let mut representatives = HashMap::<DomainId, DomainId>::default();
-        self.edges.sort();
-        self.edges.dedup();
-        for [a, b] in self.edges {
-            // a < b
-            let representative =
-                representatives.get(&a).or(representatives.get(&b)).unwrap_or(&a).clone();
-            representatives.insert(a, representative.clone());
-            representatives.insert(b, representative);
-        }
-        EqClasses::new(representatives)
-    }
-    fn better_did(a: &DomainId, b: &DomainId) -> Ordering {
-        match [a.is_primitive(), b.is_primitive()] {
-            [true, false] => Ordering::Less,
-            [false, true] => Ordering::Greater,
-            [_, _] => a.0.cmp(&b.0),
-        }
-    }
-}
-
 impl EqClasses {
-    fn new(representatives: HashMap<DomainId, DomainId>) -> Result<Self, EquateIntStrErr> {
-        let mut representative_members = HashMap::<DomainId, HashSet<DomainId>>::default();
-        for (member, representative) in &representatives {
-            representative_members
-                .entry(representative.clone())
-                .or_default()
-                .insert(member.clone());
+    pub fn new(modules: &[Module]) -> Self {
+        let mut graph = EqDomainIdGraph::default();
+        for module in modules {
+            for statement in module.statements.iter() {
+                if let Statement::Decl(vec) = statement {
+                    for slice in vec.windows(2) {
+                        if let [a, b] = slice {
+                            graph.insert(a, b);
+                        } else {
+                            unreachable!()
+                        }
+                    }
+                }
+            }
         }
+        graph.to_equivalence_classes()
+    }
+    pub fn normalize_equal_domain_ids(&self, modules: &mut [Module]) {
+        for module in modules.iter_mut() {
+            let mut guard = module.statements.as_vec_mut();
+            for statement in guard.as_mut().iter_mut() {
+                let mut clos = |did: &mut DomainId| {
+                    if let Some(representative) = self.get_representative(did) {
+                        if representative != did {
+                            *did = representative.clone();
+                        }
+                    }
+                };
+                statement.visit_mut(&mut clos);
+            }
+        }
+    }
+    pub fn get_representative<'a, 'b>(&'a self, t: &'b DomainId) -> Option<&'a DomainId> {
+        self.representatives.get(t)
+    }
+    pub fn get_representatives(&self) -> &HashMap<DomainId, DomainId> {
+        &self.representatives
+    }
+    pub fn get_representative_members(&self) -> &HashMap<DomainId, Vec<DomainId>> {
+        &self.representative_members
+    }
+    pub fn check_primitives(&self) -> Result<(), EquatePrimitivesError> {
         for did in [DomainId::str(), DomainId::int()] {
-            match representatives.get(did) {
-                Some(representative) if representative != did => {
-                    return Err(EquateIntStrErr {
-                        eq_class: representative_members.get(representative).unwrap().clone(),
+            match self.get_representative(did) {
+                Some(representative) if representative != did && representative.is_primitive() => {
+                    return Err(EquatePrimitivesError {
+                        eq_class: self.representative_members.get(representative).unwrap(),
                     })
                 }
                 _ => {}
             }
         }
-        Ok(Self { representatives, representative_members })
-    }
-    pub fn get_representative<'a, 'b>(&'a self, t: &'b DomainId) -> Option<&'a DomainId> {
-        self.representatives.get(t)
-    }
-    pub fn iter(&self) -> impl Iterator<Item = (&DomainId, &HashSet<DomainId>)> {
-        self.representative_members.iter()
+        Ok(())
     }
 }

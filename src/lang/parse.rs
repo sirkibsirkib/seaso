@@ -167,8 +167,8 @@ pub fn string(i: &str) -> IResult<&str, String> {
 }
 
 pub fn module_name(i: &str) -> IResult<&str, ModuleName> {
-    let p = nommap(id_suffix, str::to_owned);
-    nommap(p, ModuleName)(i)
+    let some_mid = recognize(pair(satisfy(|c| c.is_ascii_lowercase()), id_suffix));
+    nommap(nommap(some_mid, str::to_owned), ModuleName)(i)
 }
 
 pub fn constant(i: &str) -> IResult<&str, RuleAtom> {
