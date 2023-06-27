@@ -1,75 +1,14 @@
-{upedas(au)m(au)k(audp)g(audp)l(aue)f(ad)c(pp)o(ud)@n(audp)@$z(au)$q(aud)$h(au)$b(au)[h(AU)|l(AUE)][q(AUD)|k(AUDP)][c(PR)|c(PQ)c(QR)][g(AUDQ)|c(PQ)g(AUDP)][z(AU)n(AUDP)|k(AUDP)-g(AVDP)o(VD)][m(AU)|s(AU)f(AD)-q(AUD)][b(AU)|s(AU)h(AU)-m(AU)-z(AU)]}m
+main {
+	task agent data as=assignment(a,t)
+	assigned(t) !$unassigned(t) !$overworked(a) 
+	$eq=eq_agent(a,a) [eq(A,A)] +A
+	[assigned(T)] +as(A,T) [unassigned(T)] +T +as(T)
+	[overworked(A)] +as(A,T1) +as(A,T2) -eq(T1,T2)
+}
 
-decl user. email. agreement. data. purpose.
-defn has_email    (agreement,user).
-  signed          (agreement,user).
-  must_ask_purpose(agreement,user).
-  needs_some      (agreement,user).
-  badged          (agreement,user).
-defn asks(agreement,user,data,purpose).
-  gives  (agreement,user,data,purpose).
-  needs  (agreement,user,data,purpose).
-defn user_email(agreement,user,email). 
-  agreement_data(agreement,data).
-  purpose_subsumes(purpose,purpose).
-  asks_some_purpose(agreement,user,data).
-  data_owner(user,data).
-rule has_email(A,U) :- user_email(A,U,E).
-  asks_some_purpose(A,U,D) :- asks(A,U,D,P).
-  purpose_subsumes(P1,P3) :- purpose_subsumes(P1,P2), purpose_subsumes(P2,P3).
-  gives(A,U,D,P2) :- purpose_subsumes(P1,P2), gives(A,U,D,P1).
-  needs_some(A,U1), needs(A,U1,D,P) :- asks(A,U1,D,P), !gives(A,U2,D,P), data_owner(U2,D).
-  must_ask_purpose(A,U) :- signed(A,U), agreement_data(A,D), !asks_some_purpose(A,U,D).
-  badged(A,U) 
-  :- signed(A,U)
-  ,  has_email(A,U)
-  , !must_ask_purpose(A,U)
-  , !needs_some(A,U).
-seal needs_some. needs.
-
-u`ser e`mail a`greement d`ata p`urpose
-<h`as_email a u><s`ignedd a u><m`ust_ask_purpose a u>
-<n`eeded a u><b`adged a u><ask a u d p><give a u d p>
-<some_needed >
-
-{
-	x
-}foo
-{
-	f^oo.x=x
-	q(p,r)
-	$a*b$c
-	[x]-x
-	*q()
-	=qf.q
-}bar
-
-{
-	$p`lan u`ser t`ask t
-	<a`ssign t u>
-	$<as`signed t>
-	<eq`user u u>
-	$!<un`assigned t>
-	[un T] +T -as T
-	[eq U U] +U
-}main
-
-{
-	{
-
-	}bong
-	p
-	[+p T]+T
-}foo
-
-{
-
-	}bing
-
-{
-	main.p = foo.p
-
-	<q t>
-	[q T] +p T
-
-}bar
+plan {
+	$ag(str)=main.agent $d(int)=main.data
+	$as=main.assignment $t(int)=main.task
+	[as(ag("Amy"),t(2))]
+	[as(ag("Bob"),t(3))]
+}
