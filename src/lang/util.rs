@@ -20,12 +20,6 @@ pub struct VecSet<T: Ord> {
     elements: Vec<T>,
 }
 
-// #[derive(Default)]
-// pub struct Timer {
-//     start_instants: Vec<(&'static str, Instant)>,
-//     durations: Vec<(&'static str, Duration)>,
-// }
-
 // while this exists, the vecset has a violated invariant
 pub struct VecSetMutGuard<'a, T: Ord> {
     set: &'a mut VecSet<T>,
@@ -88,16 +82,16 @@ impl<T: Ord> VecSet<T> {
             }
         }
     }
-    pub fn as_slice_mut(&mut self) -> VecSetMutGuard<T> {
+    pub fn as_vec_mut(&mut self) -> VecSetMutGuard<T> {
         VecSetMutGuard { set: self }
     }
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.elements.iter()
     }
 }
-impl<'a, T: Ord> AsMut<[T]> for VecSetMutGuard<'a, T> {
-    fn as_mut(&mut self) -> &mut [T] {
-        self.set.elements.as_mut()
+impl<'a, T: Ord> AsMut<Vec<T>> for VecSetMutGuard<'a, T> {
+    fn as_mut(&mut self) -> &mut Vec<T> {
+        &mut self.set.elements
     }
 }
 impl<T: Ord> FromIterator<T> for VecSet<T> {
@@ -151,7 +145,16 @@ impl Debug for RuleLiteral {
 impl Debug for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            Statement::Same { a, b } => write!(f, "same {:?} = {:?}", a, b),
+            Statement::Decl(vec) => {
+                write!(f, "decl ")?;
+                for (i, did) in vec.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, "=")?;
+                    }
+                    write!(f, "{:?}", did)?
+                }
+                Ok(())
+            }
             Statement::Rule(Rule { consequents, antecedents }) => {
                 write!(f, "rule {:?}", CommaSep { iter: consequents, spaced: true })?;
                 if !antecedents.is_empty() {
@@ -159,7 +162,6 @@ impl Debug for Statement {
                 }
                 Ok(())
             }
-            Statement::Decl(did) => write!(f, "decl {:?}", did),
             Statement::Emit(did) => write!(f, "emit {:?}", did),
             Statement::Seal(did) => write!(f, "seal {:?}", did),
             Statement::Defn { did, params } => {

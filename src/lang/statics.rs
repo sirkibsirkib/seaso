@@ -60,12 +60,6 @@ pub enum ExecutableError<'a> {
 
 //////////////////
 
-impl<T> Default for EqClasser<T> {
-    fn default() -> Self {
-        Self { edges: Default::default() }
-    }
-}
-
 impl<'a> ModuleMap<'a> {
     pub fn new(modules: impl IntoIterator<Item = &'a Module>) -> Result<Self, &'a ModuleName> {
         let map =
@@ -145,14 +139,10 @@ impl ExecutableProgram {
         self.sealers_modifiers.get(did).map(|dsm| !dsm.sealers.is_empty()).unwrap_or(false)
     }
     pub fn new<'a>(module_map: &'a ModuleMap<'a>) -> Result<Self, ExecutableError<'a>> {
-        // pass 1: domain definitions and domain equalities
+        // pass 1: domain definitions
         let mut dd = DomainDefinitions::default();
-        let mut domain_eq_classer = EqClasser::<DomainId>::default();
         for (module_name, statement) in Self::module_statements(module_map) {
             match statement {
-                Statement::Same { a, b } => {
-                    domain_eq_classer.add(a.clone(), b.clone());
-                }
                 Statement::Defn { did, params } => {
                     if did.is_primitive() {
                         return Err(ExecutableError::DefiningPrimitive {
@@ -175,7 +165,6 @@ impl ExecutableProgram {
                 _ => {}
             }
         }
-        let domain_eq_classes = domain_eq_classer.to_equivalence_classes();
 
         // pass 2: everything else
         let mut annotated_rules = vec![];
@@ -216,12 +205,10 @@ impl ExecutableProgram {
                         .sealers
                         .insert(module_name.clone());
                 }
-                Statement::Decl(did) => {
-                    declared.insert(did.clone());
-                }
-                Statement::Same { a, b } => {
-                    declared.insert(a.clone());
-                    declared.insert(b.clone());
+                Statement::Decl(vec) => {
+                    for did in vec {
+                        declared.insert(did.clone());
+                    }
                 }
                 Statement::Defn { params, .. } => {
                     // did a definition pass earlier
@@ -241,7 +228,6 @@ impl ExecutableProgram {
             sealers_modifiers,
             declared_undefined,
             used_undeclared,
-            domain_eq_classes,
         })
     }
 }
@@ -264,8 +250,11 @@ impl Rule {
             ra.occurring_dids(dids)
         }
     }
-    fn root_atoms(&self) -> impl Iterator<Item = &RuleAtom> {
+    pub fn root_atoms(&self) -> impl Iterator<Item = &RuleAtom> {
         self.consequents.iter().chain(self.antecedents.iter().map(|lit| &lit.ra))
+    }
+    pub fn root_atoms_mut(&mut self) -> impl Iterator<Item = &mut RuleAtom> {
+        self.consequents.iter_mut().chain(self.antecedents.iter_mut().map(|lit| &mut lit.ra))
     }
     fn rule_type_variables(
         &self,
@@ -298,53 +287,22 @@ impl Rule {
     }
 }
 
-static LAZY_INT: OnceLock<DomainId> = OnceLock::new();
-static LAZY_STR: OnceLock<DomainId> = OnceLock::new();
+impl DomainId {
+    pub fn int() -> &'static DomainId {
+        static LAZY_INT: OnceLock<DomainId> = OnceLock::new();
+        LAZY_INT.get_or_init(|| DomainId("int".to_owned()))
+    }
+    pub fn str() -> &'static DomainId {
+        static LAZY_STR: OnceLock<DomainId> = OnceLock::new();
+        LAZY_STR.get_or_init(|| DomainId("str".to_owned()))
+    }
+}
 impl Constant {
-    pub fn domain_id(&self) -> &DomainId {
+    pub fn domain_id(&self) -> &'static DomainId {
         match self {
-            Self::Int { .. } => LAZY_INT.get_or_init(|| DomainId("int".to_owned())),
-            Self::Str { .. } => LAZY_STR.get_or_init(|| DomainId("str".to_owned())),
+            Self::Int { .. } => DomainId::int(),
+            Self::Str { .. } => DomainId::str(),
         }
-    }
-}
-
-impl<T: Ord + Hash + Clone> EqClasser<T> {
-    pub fn add(&mut self, a: T, b: T) {
-        use core::cmp::Ordering;
-        self.edges.push(match a.cmp(&b) {
-            Ordering::Less => [a, b],
-            Ordering::Greater => [b, a],
-            Ordering::Equal => return,
-        })
-    }
-    pub fn to_equivalence_classes(mut self) -> EqClasses<T> {
-        let mut representatives = HashMap::<T, T>::default();
-        self.edges.sort();
-        self.edges.dedup();
-        for [a, b] in self.edges {
-            // a < b
-            let representative =
-                representatives.get(&a).or(representatives.get(&b)).unwrap_or(&a).clone();
-            representatives.insert(a, representative.clone());
-            representatives.insert(b, representative);
-        }
-        let mut representative_members = HashMap::<T, HashSet<T>>::default();
-        for (member, representative) in &representatives {
-            representative_members
-                .entry(representative.clone())
-                .or_default()
-                .insert(member.clone());
-        }
-        EqClasses { representatives, representative_members }
-    }
-}
-impl<T: Eq + Hash> EqClasses<T> {
-    pub fn representative<'a>(&'a self, t: &'a T) -> &'a T {
-        self.representatives.get(t).unwrap_or(t)
-    }
-    pub fn representative_members(&self, t: &T) -> Option<&HashSet<T>> {
-        self.representative_members.get(t)
     }
 }
 

@@ -60,12 +60,11 @@ pub enum RuleAtom {
 /// One of five kinds of statement.
 #[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum Statement {
-    Decl(DomainId),
+    Decl(Vec<DomainId>),
     Defn { did: DomainId, params: Vec<DomainId> },
     Rule(Rule),
     Seal(DomainId),
     Emit(DomainId),
-    Same { a: DomainId, b: DomainId },
 }
 
 /// A logical implication rule with N conjunctive consequents and N conjunctive antecedents.
@@ -104,14 +103,10 @@ pub struct DomainSealersModifiers {
     modifiers: HashSet<ModuleName>,
 }
 
-pub struct EqClasser<T> {
-    edges: Vec<[T; 2]>,
-}
-
 #[derive(Debug)]
-pub struct EqClasses<T> {
-    representatives: HashMap<T, T>,
-    representative_members: HashMap<T, HashSet<T>>,
+pub struct EqClasses {
+    representatives: HashMap<DomainId, DomainId>,
+    representative_members: HashMap<DomainId, HashSet<DomainId>>,
 }
 
 #[derive(Debug)]
@@ -122,5 +117,4 @@ pub struct ExecutableProgram {
     pub(crate) sealers_modifiers: HashMap<DomainId, DomainSealersModifiers>,
     pub(crate) declared_undefined: HashSet<DomainId>,
     pub(crate) used_undeclared: HashSet<DomainId>,
-    pub(crate) domain_eq_classes: EqClasses<DomainId>,
 }
