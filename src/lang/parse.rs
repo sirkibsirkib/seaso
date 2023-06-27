@@ -149,7 +149,9 @@ pub fn id_suffix(i: &str) -> IResult<&str, &str> {
 }
 
 pub fn domain_id(i: &str) -> IResult<&str, DomainId> {
-    let did = recognize(pair(satisfy(|c| c.is_ascii_lowercase()), id_suffix));
+    let fst = pair(satisfy(|c| c.is_ascii_lowercase()), id_suffix);
+    let snd = pair(ws(tag("@")), module_name);
+    let did = recognize(pair(fst, opt(snd)));
     nommap(ws(did), |ident| DomainId(ident.to_owned()))(i)
 }
 

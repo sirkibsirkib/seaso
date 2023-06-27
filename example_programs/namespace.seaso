@@ -1,0 +1,8 @@
+part main {
+	decl int=p=q. q=r.
+	defn a(r).
+}
+part y {
+	decl a = main@x.
+	rule a(2).
+}

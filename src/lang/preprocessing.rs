@@ -1,4 +1,5 @@
 use crate::{statics::Module, *};
+use core::cmp::Ordering;
 use std::collections::HashMap;
 
 trait VisitMut<T> {
@@ -6,6 +7,7 @@ trait VisitMut<T> {
 }
 
 pub struct EqClasser {
+    // invariant: strictly descending order WRT `Self::better_did`
     edges: Vec<[DomainId; 2]>,
 }
 
@@ -160,8 +162,7 @@ pub fn comments_removed(mut s: String) -> String {
 
 impl EqClasser {
     fn add(&mut self, a: DomainId, b: DomainId) {
-        use core::cmp::Ordering;
-        self.edges.push(match a.cmp(&b) {
+        self.edges.push(match Self::better_did(&a, &b) {
             Ordering::Less => [a, b],
             Ordering::Greater => [b, a],
             Ordering::Equal => return,
@@ -178,6 +179,19 @@ impl EqClasser {
             representatives.insert(a, representative.clone());
             representatives.insert(b, representative);
         }
+        EqClasses::new(representatives)
+    }
+    fn better_did(a: &DomainId, b: &DomainId) -> Ordering {
+        match [a.is_primitive(), b.is_primitive()] {
+            [true, false] => Ordering::Less,
+            [false, true] => Ordering::Greater,
+            [_, _] => a.0.cmp(&b.0),
+        }
+    }
+}
+
+impl EqClasses {
+    fn new(representatives: HashMap<DomainId, DomainId>) -> Result<Self, EquateIntStrErr> {
         let mut representative_members = HashMap::<DomainId, HashSet<DomainId>>::default();
         for (member, representative) in &representatives {
             representative_members
@@ -185,48 +199,22 @@ impl EqClasser {
                 .or_default()
                 .insert(member.clone());
         }
-        let mut eq_classes = EqClasses { representatives, representative_members };
-        match [
-            eq_classes.get_representative(DomainId::int()),
-            eq_classes.get_representative(DomainId::str()),
-        ] {
-            [Some(a), Some(b)] if a == b => {
-                let a = a.clone();
-                return Err(EquateIntStrErr {
-                    eq_class: eq_classes.representative_members.remove(&a).unwrap(),
-                });
-            }
-            _ => {
-                eq_classes.make_representative(DomainId::int());
-                eq_classes.make_representative(DomainId::str());
-                Ok(eq_classes)
+        for did in [DomainId::str(), DomainId::int()] {
+            match representatives.get(did) {
+                Some(representative) if representative != did => {
+                    return Err(EquateIntStrErr {
+                        eq_class: representative_members.get(representative).unwrap().clone(),
+                    })
+                }
+                _ => {}
             }
         }
+        Ok(Self { representatives, representative_members })
     }
-}
-impl EqClasses {
     pub fn get_representative<'a, 'b>(&'a self, t: &'b DomainId) -> Option<&'a DomainId> {
         self.representatives.get(t)
     }
-    pub fn get_representative_members(&self, t: &DomainId) -> Option<&HashSet<DomainId>> {
-        self.representative_members.get(t)
-    }
     pub fn iter(&self) -> impl Iterator<Item = (&DomainId, &HashSet<DomainId>)> {
         self.representative_members.iter()
-    }
-    pub fn make_representative(&mut self, new: &DomainId) {
-        if let Some(old) = self.representatives.get_mut(new) {
-            if old == new {
-                return; // nothing to do here
-            }
-            let old = std::mem::replace(old, new.clone());
-            let class = self.representative_members.remove(&old).unwrap();
-            for member in class.iter() {
-                self.representatives.insert(member.clone(), new.clone());
-            }
-            self.representative_members.insert(new.clone(), class);
-        } else {
-            // nothing to do here
-        }
     }
 }
