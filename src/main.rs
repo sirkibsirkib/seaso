@@ -1,3 +1,4 @@
+mod config;
 mod lang;
 
 use lang::*;
@@ -10,54 +11,32 @@ fn stdin_to_string() -> Result<String, std::io::Error> {
     Ok(buffer)
 }
 
-struct Config {
-    dot: bool,
-    asp: bool,
-    source: bool,
-    denotation: bool,
-    ast: bool,
-    global: bool, // when true, does NOT implicitly localize module-free domain names
-}
-
-impl Config {
-    fn new() -> Self {
-        let get = |s1| std::env::args().find(|s2| s1 == s2).is_some();
-        Self {
-            source: get("--source"),
-            dot: get("--dot"),
-            asp: get("--asp"),
-            denotation: get("--denotation"),
-            ast: get("--ast"),
-            global: get("--global"),
-        }
-    }
-}
-
 fn main() -> Result<(), ()> {
-    let config = Config::new();
+    let config = config::Config::default();
     let source = stdin_to_string().expect("bad stdin");
     let source = preprocessing::comments_removed(source);
-    if config.source {
+    if config.test("source") {
         println!("source after preprocessing: <<\n{}\n>>", &source);
     }
     let mut parse_result = nom::combinator::all_consuming(parse::modules_and_statements)(&source);
     match &mut parse_result {
         Ok((_, modules)) => {
-            if config.ast {
+            if config.test("ast") {
                 println!("ast: {:#?}", modules);
             }
-            preprocessing::normalize_domain_id_formatting(modules, config.global);
+            preprocessing::normalize_domain_id_formatting(modules, config.test("global"));
             let eq_classes = EqClasses::new(modules);
-            println!(
-                "domain equivalence class representatives {:?}",
-                eq_classes.get_representatives()
-            );
-            println!(
-                "domain equivalence class representative members {:?}",
-                eq_classes.get_representative_members()
-            );
+            if config.test("eq") {
+                println!(
+                    "domain equivalence class representatives {:?}",
+                    eq_classes.get_representatives()
+                );
+                println!(
+                    "domain equivalence class representative members {:?}",
+                    eq_classes.get_representative_members()
+                );
+            }
             eq_classes.normalize_equal_domain_ids(modules);
-            println!("{:#?}", modules);
             if let Err(e) = eq_classes.check_primitives() {
                 println!("equivalence class error: {:?}", e);
             } else {
@@ -75,13 +54,13 @@ fn main() -> Result<(), ()> {
                                 let mp = statics::ModulePreorder::new(&module_map);
                                 let seal_breaks = mp.iter_breaks(&ep).collect::<HashSet<_>>();
                                 println!("seal breaks: {:#?}", &seal_breaks);
-                                if config.asp {
+                                if config.test("asp") {
                                     println!("asp print:\n{}", ep.asp_print());
                                 }
-                                if config.dot {
+                                if config.test("dot") {
                                     println!("ontology dot:\n{}", ep.ontology_dot());
                                 }
-                                if config.denotation {
+                                if config.test("denotation") {
                                     println!(
                                         "denotation: {:#?}",
                                         dynamics::Executable::denotation(&ep)
