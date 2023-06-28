@@ -1,5 +1,8 @@
 # Seaso Executor
 This contains the source code of the Seaso executor, which can be compiled to a standalone executable, or used as a Rust library.
+Seaso is a simple logic programming language.
+In a nutshell, each Seaso program (1) models the facts of a system, (2) prescribes which facts are undesirable, and (3) specifies how the program may be extended.
+Seaso is based on the well-founded semantics by Van Gelder et al, and the underlying design decisions are motivated by its application to data exchange systems.  
 
 ## Executable
 
