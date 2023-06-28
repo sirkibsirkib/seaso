@@ -38,7 +38,7 @@ fn main() -> Result<(), ()> {
             }
             eq_classes.normalize_equal_domain_ids(parts);
             if let Err(e) = eq_classes.check_primitives() {
-                println!("equivalence class error: {:?}", e);
+                println!("domain equivalence class error: {:?}", e);
             } else {
                 preprocessing::deanonymize_variables(parts);
                 if config.test("ast2") {
@@ -56,7 +56,7 @@ fn main() -> Result<(), ()> {
                         }
                         match ep {
                             Ok(ep) => {
-                                println!("used undeclared: {:?}", ep.used_undeclared);
+                                println!("used undeclared domains: {:?}", ep.used_undeclared);
                                 let mp = statics::PartPreorder::new(&part_map);
                                 let seal_breaks = mp.iter_breaks(&ep).collect::<HashSet<_>>();
                                 println!("seal breaks: {:#?}", seal_breaks);

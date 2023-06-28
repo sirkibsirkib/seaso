@@ -29,37 +29,35 @@ Always, truths and unknowns are disjoint, and truths are a superset of emissions
 Here is an example output resulting from the above usage.
 
 ```
-TimesTaken {
-    parse: 59.3µs,
-    check: 494.1µs,
-    denote: 796.8µs,
-}
-Denotation {
+dependend undefined parts: {}
+used undeclared domains: {}
+seal breaks: {}
+denotation: Denotation {
     truths: {
         eq: [
             eq(party("Amy"), party("Amy")),
             eq(party("Bob"), party("Bob")),
             eq(party("Dan"), party("Dan")),
         ],
-        untrusted: [
-            untrusted(party("Amy")),
-        ],
         party: [
             party("Amy"),
             party("Bob"),
             party("Dan"),
         ],
-        very_trusted: [
-            very_trusted(party("Bob")),
+        trust: [
+            trust(party("Amy"), party("Bob")),
+            trust(party("Amy"), party("Dan")),
+            trust(party("Dan"), party("Bob")),
         ],
         trusted: [
             trusted(party("Bob")),
             trusted(party("Dan")),
         ],
-        trust: [
-            trust(party("Amy"), party("Bob")),
-            trust(party("Amy"), party("Dan")),
-            trust(party("Dan"), party("Bob")),
+        untrusted: [
+            untrusted(party("Amy")),
+        ],
+        very_trusted: [
+            very_trusted(party("Bob")),
         ],
     },
     unknowns: {},
@@ -69,11 +67,20 @@ Denotation {
         ],
     },
 }
-undeclared domains: {}
-seal broken: None
-check error None
-parse error None
 ```
+
+### CLI options
+Run the tool with flag `--help` to see the optional arguments, used to customize the output.
+
+Some of the arguments change the preprocessor, for example, only _without_ `--no-local` are these two programs equivalent:
+```seaso
+part x { decl   x. }
+```
+```seaso
+part x { decl a@x. }
+```
+
+Most of the arguments change which metadata is printed. For exampe, _with_ `--ast1` and `--ast2`, the abstract syntax tree is printed before and after preprocessing, respectively.  
 
 ## Source and library
 
