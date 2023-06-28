@@ -95,12 +95,12 @@ pub struct AnnotatedRule {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub struct ModuleName(pub String);
+pub struct PartName(pub String);
 
 #[derive(Debug, Default)]
 pub struct DomainSealersModifiers {
-    sealers: HashSet<ModuleName>,
-    modifiers: HashSet<ModuleName>,
+    sealers: HashSet<PartName>,
+    modifiers: HashSet<PartName>,
 }
 
 #[derive(Debug)]

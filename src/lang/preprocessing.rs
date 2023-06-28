@@ -1,5 +1,5 @@
 use crate::lang::VecSet;
-use crate::{statics::Module, *};
+use crate::{statics::Part, *};
 use core::cmp::Ordering;
 use std::collections::HashMap;
 
@@ -17,9 +17,9 @@ pub struct EquatePrimitivesError<'a> {
 }
 
 ////////////////
-pub fn normalize_domain_id_formatting(modules: &mut [Module], localize: bool) {
-    for module in modules.iter_mut() {
-        let mut guard = module.statements.as_vec_mut();
+pub fn normalize_domain_id_formatting(parts: &mut [Part], localize: bool) {
+    for part in parts.iter_mut() {
+        let mut guard = part.statements.as_vec_mut();
         for statement in guard.as_mut().iter_mut() {
             let mut clos = |did: &mut DomainId| {
                 if did.is_primitive() {
@@ -28,9 +28,9 @@ pub fn normalize_domain_id_formatting(modules: &mut [Module], localize: bool) {
                 // do this regardless of `localize`
                 did.0.retain(|c| !c.is_whitespace());
                 // do this only if `localize`
-                if localize && module.name.0 != "" && !did.0.contains("@") {
+                if localize && part.name.0 != "" && !did.0.contains("@") {
                     did.0.push_str("@");
-                    did.0.push_str(&module.name.0);
+                    did.0.push_str(&part.name.0);
                 }
             };
             statement.visit_mut(&mut clos);
@@ -98,9 +98,9 @@ impl<'a> EqDomainIdGraph<'a> {
     }
 }
 
-pub fn deanonymize_variables(modules: &mut [Module]) {
-    for module in modules {
-        let mut guard = module.statements.as_vec_mut();
+pub fn deanonymize_variables(parts: &mut [Part]) {
+    for part in parts {
+        let mut guard = part.statements.as_vec_mut();
         for statement in guard.as_mut().iter_mut() {
             if let Statement::Rule(r) = statement {
                 let mut next_idx = 0;
@@ -210,10 +210,10 @@ pub fn comments_removed(mut s: String) -> String {
 }
 
 impl EqClasses {
-    pub fn new(modules: &[Module]) -> Self {
+    pub fn new(parts: &[Part]) -> Self {
         let mut graph = EqDomainIdGraph::default();
-        for module in modules {
-            for statement in module.statements.iter() {
+        for part in parts {
+            for statement in part.statements.iter() {
                 if let Statement::Decl(vec) = statement {
                     for slice in vec.windows(2) {
                         if let [a, b] = slice {
@@ -227,9 +227,9 @@ impl EqClasses {
         }
         graph.to_equivalence_classes()
     }
-    pub fn normalize_equal_domain_ids(&self, modules: &mut [Module]) {
-        for module in modules.iter_mut() {
-            let mut guard = module.statements.as_vec_mut();
+    pub fn normalize_equal_domain_ids(&self, parts: &mut [Part]) {
+        for part in parts.iter_mut() {
+            let mut guard = part.statements.as_vec_mut();
             for statement in guard.as_mut().iter_mut() {
                 let mut clos = |did: &mut DomainId| {
                     if let Some(representative) = self.get_representative(did) {

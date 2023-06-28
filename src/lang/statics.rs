@@ -7,26 +7,26 @@ use std::{
     sync::OnceLock,
 };
 
-pub struct ModuleMap<'a> {
-    map: HashMap<&'a ModuleName, &'a Module>,
+pub struct PartMap<'a> {
+    map: HashMap<&'a PartName, &'a Part>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct Module {
-    pub name: ModuleName,
-    pub uses: VecSet<ModuleName>,
+pub struct Part {
+    pub name: PartName,
+    pub uses: VecSet<PartName>,
     pub statements: VecSet<Statement>,
 }
-pub struct ModulePreorder<'a> {
-    edges: HashSet<[&'a ModuleName; 2]>,
+pub struct PartPreorder<'a> {
+    edges: HashSet<[&'a PartName; 2]>,
 }
 
 /// Identifies which statements first seal and then modify which domain.
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct SealBreak<'a> {
     pub did: &'a DomainId,
-    pub modifier: &'a ModuleName,
-    pub sealer: &'a ModuleName,
+    pub modifier: &'a PartName,
+    pub sealer: &'a PartName,
 }
 
 #[derive(Debug)]
@@ -41,53 +41,40 @@ pub enum ExecutableRuleError {
 
 #[derive(Debug)]
 pub enum ExecutableError<'a> {
-    ConflictingDefinitions {
-        module_name: &'a ModuleName,
-        did: DomainId,
-        params: [Vec<DomainId>; 2],
-    },
-    DefiningPrimitive {
-        module_name: &'a ModuleName,
-        did: DomainId,
-        params: &'a [DomainId],
-    },
-    ExecutableRuleError {
-        module_name: &'a ModuleName,
-        rule: &'a Rule,
-        err: ExecutableRuleError,
-    },
+    ConflictingDefinitions { part_name: &'a PartName, did: DomainId, params: [Vec<DomainId>; 2] },
+    DefiningPrimitive { part_name: &'a PartName, did: DomainId, params: &'a [DomainId] },
+    ExecutableRuleError { part_name: &'a PartName, rule: &'a Rule, err: ExecutableRuleError },
 }
 
 //////////////////
 
-impl<'a> ModuleMap<'a> {
-    pub fn new(modules: impl IntoIterator<Item = &'a Module>) -> Result<Self, &'a ModuleName> {
-        let map =
-            util::collect_map_lossless(modules.into_iter().map(|module| (&module.name, module)));
+impl<'a> PartMap<'a> {
+    pub fn new(parts: impl IntoIterator<Item = &'a Part>) -> Result<Self, &'a PartName> {
+        let map = util::collect_map_lossless(parts.into_iter().map(|part| (&part.name, part)));
         map.map(|map| Self { map })
     }
-    pub fn used_undefined_names(&self) -> impl Iterator<Item = &ModuleName> {
-        self.used_modules().filter(|name| !self.map.contains_key(name))
+    pub fn depended_undefined_names(&self) -> impl Iterator<Item = &PartName> {
+        self.depended_parts().filter(|name| !self.map.contains_key(name))
     }
-    pub fn used_modules(&self) -> impl Iterator<Item = &ModuleName> {
-        self.map.values().flat_map(|module| module.uses.iter())
+    pub fn depended_parts(&self) -> impl Iterator<Item = &PartName> {
+        self.map.values().flat_map(|part| part.uses.iter())
     }
 }
 
-impl<'a> ModulePreorder<'a> {
-    pub fn new(module_map: &'a ModuleMap<'a>) -> Self {
-        let mut edges = HashSet::<[&'a ModuleName; 2]>::default();
-        for (&x, module) in &module_map.map {
-            for y in module.uses.iter() {
+impl<'a> PartPreorder<'a> {
+    pub fn new(part_map: &'a PartMap<'a>) -> Self {
+        let mut edges = HashSet::<[&'a PartName; 2]>::default();
+        for (&x, part) in &part_map.map {
+            for y in part.uses.iter() {
                 if x != y {
                     edges.insert([x, y]);
                 }
             }
         }
-        for &x in module_map.map.keys() {
-            for &y in module_map.map.keys() {
+        for &x in part_map.map.keys() {
+            for &y in part_map.map.keys() {
                 if x != y {
-                    for &z in module_map.map.keys() {
+                    for &z in part_map.map.keys() {
                         if x != z
                             && y != z
                             && edges.contains(&[x, y])
@@ -128,25 +115,25 @@ impl DomainId {
 }
 
 impl ExecutableProgram {
-    fn module_statements<'a>(
-        module_map: &'a ModuleMap<'a>,
-    ) -> impl Iterator<Item = (&ModuleName, &Statement)> {
-        module_map.map.iter().flat_map(move |(&module_name, module)| {
-            module.statements.iter().map(move |statement| (module_name, statement))
+    fn part_statements<'a>(
+        part_map: &'a PartMap<'a>,
+    ) -> impl Iterator<Item = (&PartName, &Statement)> {
+        part_map.map.iter().flat_map(move |(&part_name, part)| {
+            part.statements.iter().map(move |statement| (part_name, statement))
         })
     }
     pub fn is_sealed(&self, did: &DomainId) -> bool {
         self.sealers_modifiers.get(did).map(|dsm| !dsm.sealers.is_empty()).unwrap_or(false)
     }
-    pub fn new<'a>(module_map: &'a ModuleMap<'a>) -> Result<Self, ExecutableError<'a>> {
+    pub fn new<'a>(part_map: &'a PartMap<'a>) -> Result<Self, ExecutableError<'a>> {
         // pass 1: domain definitions
         let mut dd = DomainDefinitions::default();
-        for (module_name, statement) in Self::module_statements(module_map) {
+        for (part_name, statement) in Self::part_statements(part_map) {
             match statement {
                 Statement::Defn { did, params } => {
                     if did.is_primitive() {
                         return Err(ExecutableError::DefiningPrimitive {
-                            module_name,
+                            part_name,
                             did: did.clone(),
                             params,
                         });
@@ -155,7 +142,7 @@ impl ExecutableProgram {
                     if let Some(previous_params) = prev {
                         if &previous_params != params {
                             return Err(ExecutableError::ConflictingDefinitions {
-                                module_name,
+                                part_name,
                                 did: did.clone(),
                                 params: [previous_params, params.clone()],
                             });
@@ -172,19 +159,19 @@ impl ExecutableProgram {
         let mut emissive = HashSet::<DomainId>::default();
         let mut declared = HashSet::<DomainId>::default();
         let mut used = HashSet::<DomainId>::default();
-        for (module_name, statement) in Self::module_statements(module_map) {
+        for (part_name, statement) in Self::part_statements(part_map) {
             match statement {
                 Statement::Rule(rule) => {
                     rule.occurring_dids(&mut used);
                     let v2d = rule.rule_type_variables(&dd).map_err(|err| {
-                        ExecutableError::ExecutableRuleError { module_name, rule, err }
+                        ExecutableError::ExecutableRuleError { part_name, rule, err }
                     })?;
                     for did in rule.consequents.iter().map(|x| x.domain_id(&v2d).expect("WAH")) {
                         sealers_modifiers
                             .entry(did.clone())
                             .or_default()
                             .modifiers
-                            .insert(module_name.clone());
+                            .insert(part_name.clone());
                     }
                     annotated_rules.push(AnnotatedRule { v2d, rule: rule.clone() })
                 }
@@ -194,7 +181,7 @@ impl ExecutableProgram {
                         .entry(did.clone())
                         .or_default()
                         .modifiers
-                        .insert(module_name.clone());
+                        .insert(part_name.clone());
                     emissive.insert(did.clone());
                 }
                 Statement::Seal(did) => {
@@ -203,15 +190,16 @@ impl ExecutableProgram {
                         .entry(did.clone())
                         .or_default()
                         .sealers
-                        .insert(module_name.clone());
+                        .insert(part_name.clone());
                 }
                 Statement::Decl(vec) => {
                     for did in vec {
                         declared.insert(did.clone());
                     }
                 }
-                Statement::Defn { params, .. } => {
+                Statement::Defn { params, did } => {
                     // did a definition pass earlier
+                    declared.insert(did.clone());
                     for param in params {
                         used.insert(param.clone());
                     }

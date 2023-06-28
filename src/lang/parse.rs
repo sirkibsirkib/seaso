@@ -1,5 +1,5 @@
 use crate::lang::VecSet;
-use crate::{statics::Module, *};
+use crate::{statics::Part, *};
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -59,38 +59,38 @@ where
 
 ////////////////////////////
 
-pub fn modules_and_statements(mut i: &str) -> IResult<&str, Vec<Module>> {
+pub fn parts_and_statements(mut i: &str) -> IResult<&str, Vec<Part>> {
     let mut anon_mod_statements = VecSet::<Statement>::default();
-    let mut modules = vec![];
+    let mut parts = vec![];
     loop {
         if let Ok((i2, ss)) = statements1(i) {
             for s in ss {
                 anon_mod_statements.insert(s);
             }
             i = i2;
-        } else if let Ok((i2, m)) = module(i) {
-            modules.push(m);
+        } else if let Ok((i2, m)) = part(i) {
+            parts.push(m);
             i = i2;
         } else {
-            let anon_module = Module {
-                name: ModuleName("".into()),
+            let anon_part = Part {
+                name: PartName("".into()),
                 uses: Default::default(),
                 statements: anon_mod_statements,
             };
-            modules.push(anon_module);
-            return Ok((i, modules));
+            parts.push(anon_part);
+            return Ok((i, parts));
         };
     }
 }
 
-pub fn module(i: &str) -> IResult<&str, Module> {
+pub fn part(i: &str) -> IResult<&str, Part> {
     // let uses =
     let (i, (name, maybe_uses, statements)) = tuple((
-        preceded(ws(tag("part")), module_name),
-        opt(preceded(ws(tag(":")), commasep(module_name))),
+        preceded(ws(tag("part")), part_name),
+        opt(preceded(ws(tag(":")), commasep(part_name))),
         terminated(preceded(ws(tag("{")), statements0), ws(tag("}"))),
     ))(i)?;
-    Ok((i, Module { name, uses: VecSet::from_vec(maybe_uses.unwrap_or_default()), statements }))
+    Ok((i, Part { name, uses: VecSet::from_vec(maybe_uses.unwrap_or_default()), statements }))
 }
 pub fn like_statements(i: &str) -> IResult<&str, Vec<Statement>> {
     pub fn stmts1<'a, F: FnMut(&'a str) -> IResult<&'a str, Statement> + 'a>(
@@ -150,7 +150,7 @@ pub fn id_suffix(i: &str) -> IResult<&str, &str> {
 
 pub fn domain_id(i: &str) -> IResult<&str, DomainId> {
     let fst = pair(satisfy(|c| c.is_ascii_lowercase()), id_suffix);
-    let snd = pair(ws(tag("@")), module_name);
+    let snd = pair(ws(tag("@")), part_name);
     let did = recognize(pair(fst, opt(snd)));
     nommap(ws(did), |ident| DomainId(ident.to_owned()))(i)
 }
@@ -166,9 +166,9 @@ pub fn string(i: &str) -> IResult<&str, String> {
     nommap(delimited(tag("\""), recognize(many0_count(none_of("\""))), tag("\"")), str::to_owned)(i)
 }
 
-pub fn module_name(i: &str) -> IResult<&str, ModuleName> {
+pub fn part_name(i: &str) -> IResult<&str, PartName> {
     let some_mid = recognize(pair(satisfy(|c| c.is_ascii_lowercase()), id_suffix));
-    nommap(nommap(some_mid, str::to_owned), ModuleName)(i)
+    nommap(nommap(some_mid, str::to_owned), PartName)(i)
 }
 
 pub fn constant(i: &str) -> IResult<&str, RuleAtom> {

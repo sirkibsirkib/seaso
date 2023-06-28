@@ -19,7 +19,8 @@ static FLAG_DESC_SLICE: &[(&str, &str)] = &[
     ("ast2", "print abstract syntax tree after preprocessing"),
     ("dot", "print GraphViz (.dot) graph ontology of defined domains"),
     ("eq", "print domain equivlance classes and their representative members"),
-    ("no-local", "do not implicitly localize ('namespace') domains"),
+    ("ir", "print the internal representation (used to compute the denotation)"),
+    ("no-local", "do not implicitly localize ('namespace') domains to parts"),
     ("no-deno", "do not print the program denotation, i.e., truths and unknowns"),
     ("source", "print given Seaso source code after preprocessing"),
 ];

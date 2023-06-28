@@ -18,14 +18,14 @@ fn main() -> Result<(), ()> {
     if config.test("source") {
         println!("source after preprocessing: <<\n{}\n>>", &source);
     }
-    let mut parse_result = nom::combinator::all_consuming(parse::modules_and_statements)(&source);
+    let mut parse_result = nom::combinator::all_consuming(parse::parts_and_statements)(&source);
     match &mut parse_result {
-        Ok((_, modules)) => {
+        Ok((_, parts)) => {
             if config.test("ast1") {
-                println!("ast before preprocessing: {:#?}", modules);
+                println!("ast before preprocessing: {:#?}", parts);
             }
-            preprocessing::normalize_domain_id_formatting(modules, !config.test("no-local"));
-            let eq_classes = EqClasses::new(modules);
+            preprocessing::normalize_domain_id_formatting(parts, !config.test("no-local"));
+            let eq_classes = EqClasses::new(parts);
             if config.test("eq") {
                 println!(
                     "domain equivalence class representatives {:?}",
@@ -36,27 +36,30 @@ fn main() -> Result<(), ()> {
                     eq_classes.get_representative_members()
                 );
             }
-            eq_classes.normalize_equal_domain_ids(modules);
+            eq_classes.normalize_equal_domain_ids(parts);
             if let Err(e) = eq_classes.check_primitives() {
                 println!("equivalence class error: {:?}", e);
             } else {
-                preprocessing::deanonymize_variables(modules);
+                preprocessing::deanonymize_variables(parts);
                 if config.test("ast2") {
-                    println!("ast after preprocessing: {:#?}", modules);
+                    println!("ast after preprocessing: {:#?}", parts);
                 }
-                let module_map_result = statics::ModuleMap::new(modules.iter());
-                match module_map_result {
-                    Err(clashing_name) => println!("clashing module name: {:?}", clashing_name),
-                    Ok(module_map) => {
-                        let uumn = module_map.used_undefined_names().collect::<HashSet<_>>();
-                        println!("used_undefined_module: {:#?}", uumn);
-                        let ep = ExecutableProgram::new(&module_map);
+                let part_map_result = statics::PartMap::new(parts.iter());
+                match part_map_result {
+                    Err(clashing_name) => println!("clashing part name: {:?}", clashing_name),
+                    Ok(part_map) => {
+                        let dumn = part_map.depended_undefined_names().collect::<HashSet<_>>();
+                        println!("dependend undefined parts: {:?}", dumn);
+                        let ep = ExecutableProgram::new(&part_map);
+                        if config.test("ir") {
+                            println!("internal representation: {:#?}", ep);
+                        }
                         match ep {
                             Ok(ep) => {
-                                println!("used undeclared: {:?}", &ep.used_undeclared);
-                                let mp = statics::ModulePreorder::new(&module_map);
+                                println!("used undeclared: {:?}", ep.used_undeclared);
+                                let mp = statics::PartPreorder::new(&part_map);
                                 let seal_breaks = mp.iter_breaks(&ep).collect::<HashSet<_>>();
-                                println!("seal breaks: {:#?}", &seal_breaks);
+                                println!("seal breaks: {:#?}", seal_breaks);
                                 if config.test("asp") {
                                     println!("asp print:\n{}", ep.asp_print());
                                 }
