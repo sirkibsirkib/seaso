@@ -1,5 +1,5 @@
 mod config;
-mod lang;
+pub mod lang;
 
 use lang::*;
 use std::collections::HashSet;
