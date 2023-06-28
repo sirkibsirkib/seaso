@@ -1,5 +1,5 @@
 use crate::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 type VarRewrites<'a> = HashMap<&'a VariableId, RuleAtom>;
 

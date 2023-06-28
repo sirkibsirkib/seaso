@@ -115,6 +115,9 @@ impl DomainId {
 }
 
 impl ExecutableProgram {
+    pub fn get_used_undeclared(&self) -> &HashSet<DomainId> {
+        &self.used_undeclared
+    }
     fn part_statements<'a>(
         part_map: &'a PartMap<'a>,
     ) -> impl Iterator<Item = (&PartName, &Statement)> {

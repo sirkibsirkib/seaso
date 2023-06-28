@@ -1,7 +1,7 @@
 use crate::lang::VecSet;
 use crate::{statics::Part, *};
 use core::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 trait VisitMut<T> {
     fn visit_mut<F: FnMut(&mut T)>(&mut self, f: &mut F);
