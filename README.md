@@ -75,13 +75,7 @@ denotation: Denotation {
 ### CLI options
 Run the tool with flag `--help` to see the optional arguments, used to customize the output.
 
-Some of the arguments change the preprocessor, for example, only _without_ `--no-local` is the former program preprocessed to the latter:
-```seaso
-part x { decl   x. }
-```
-```seaso
-part x { decl a@x. }
-```
+Some of the arguments change the preprocessor. For example, only _without_ `--no-local` is program `part x { decl a  . }` preprocessed to `part x { decl a@x. }`.
 
 Most of the arguments change which metadata is printed. For exampe, _with_ `--ast1` and `--ast2`, the abstract syntax tree is printed before and after preprocessing, respectively.  
 
