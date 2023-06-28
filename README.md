@@ -72,7 +72,7 @@ denotation: Denotation {
 ### CLI options
 Run the tool with flag `--help` to see the optional arguments, used to customize the output.
 
-Some of the arguments change the preprocessor, for example, only _without_ `--no-local` are these two programs equivalent:
+Some of the arguments change the preprocessor, for example, only _without_ `--no-local` is the former program preprocessed to the latter:
 ```seaso
 part x { decl   x. }
 ```
