@@ -26,7 +26,7 @@ Run the Seaso executor, feeding in your source code as standard input. For examp
 
 ### Output
 
-Once the Seaso executor has consumed all standard input, it will parse and check if your Seaso program is well-formed, and if, so, will compute and output its denotation.
+Once the Seaso executor has consumed all standard input, it will parse and check if your Seaso program is well-formed, and if so, will compute and output its denotation.
 The denotation consists of three sets of atoms: _truths_, _unknowns_, and _emissions_.
 Always, truths and unknowns are disjoint, and truths are a superset of emissions.
 Here is an example output resulting from the above usage.
