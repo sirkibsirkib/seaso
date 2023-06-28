@@ -17,7 +17,7 @@ pub struct EquatePrimitivesError<'a> {
 }
 
 ////////////////
-pub fn normalize_domain_id_formatting(modules: &mut [Module], global: bool) {
+pub fn normalize_domain_id_formatting(modules: &mut [Module], localize: bool) {
     for module in modules.iter_mut() {
         let mut guard = module.statements.as_vec_mut();
         for statement in guard.as_mut().iter_mut() {
@@ -25,8 +25,10 @@ pub fn normalize_domain_id_formatting(modules: &mut [Module], global: bool) {
                 if did.is_primitive() {
                     return;
                 }
+                // do this regardless of `localize`
                 did.0.retain(|c| !c.is_whitespace());
-                if module.name.0 != "" && !global && !did.0.contains("@") {
+                // do this only if `localize`
+                if localize && module.name.0 != "" && !did.0.contains("@") {
                     did.0.push_str("@");
                     did.0.push_str(&module.name.0);
                 }

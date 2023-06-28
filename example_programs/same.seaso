@@ -2,8 +2,6 @@ decl a=b=c. i=int.
 defn a(i).
 rule c(2).
 
-
-
-<
-a(i)=b=c i=int [c(2)]
->
+part benis {
+    decl x     @ benis.
+}

@@ -13,33 +13,41 @@ impl Config {
         self.present_flag_names.contains(flag_name)
     }
 }
+static FLAG_DESC_SLICE: &[(&str, &str)] = &[
+    ("asp", "print Clingo-style answer set program solving for facts removing emissions"),
+    ("ast1", "print abstract syntax tree before preprocessing"),
+    ("ast2", "print abstract syntax tree after preprocessing"),
+    ("dot", "print GraphViz (.dot) graph ontology of defined domains"),
+    ("eq", "print domain equivlance classes and their representative members"),
+    ("no-local", "do not implicitly localize ('namespace') domains"),
+    ("no-deno", "do not print the program denotation, i.e., truths and unknowns"),
+    ("source", "print given Seaso source code after preprocessing"),
+];
 impl Default for Config {
     fn default() -> Self {
-        let defined_flag_name_to_description = [
-            ("source", "print given Seaso source code after preprocessing"),
-            ("dot", "print GraphViz (.dot) graph ontology of defined domains"),
-            ("ast", "print abstract syntax tree after preprocessing"),
-            ("asp", "print Clingo-style answer set program solving for facts removing emissions"),
-            ("global", "override implicit qualification of part-unqualified domains"),
-            ("eq", "print domain equivlance classes and their representative members"),
-        ]
-        .into_iter()
-        .collect();
         if std::env::args().find(|s| s == "--help").is_some() {
             println!("Seaso executor help information. Flags:");
             println!("  --{: <8}  {}", "help", "print this");
-            for (k, v) in defined_flag_name_to_description {
-                println!("  --{: <8}  {}", k, v);
+            for (name, desc) in FLAG_DESC_SLICE {
+                println!(" --{: <8}  {}", name, desc);
             }
             std::process::exit(0);
         }
+        let defined_flag_name_to_description: HashMap<_, _> =
+            FLAG_DESC_SLICE.into_iter().copied().collect();
         let present_flag_names = std::env::args()
             .skip(1)
             .filter_map(|mut s| {
-                if s.starts_with("--") {
-                    s.retain(|c| c != '-');
+                if s == "--" {
+                    None
+                } else if s.starts_with("--") {
+                    s.replace_range(0.."--".len(), "");
+                    if !defined_flag_name_to_description.contains_key(s.as_str()) {
+                        println!("Warning: unrecognized flag  `{}`", s);
+                    }
                     Some(s)
                 } else {
+                    println!("Warning: unrecognized input `{}`", s);
                     None
                 }
             })

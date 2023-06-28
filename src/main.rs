@@ -21,10 +21,10 @@ fn main() -> Result<(), ()> {
     let mut parse_result = nom::combinator::all_consuming(parse::modules_and_statements)(&source);
     match &mut parse_result {
         Ok((_, modules)) => {
-            if config.test("ast") {
-                println!("ast: {:#?}", modules);
+            if config.test("ast1") {
+                println!("ast before preprocessing: {:#?}", modules);
             }
-            preprocessing::normalize_domain_id_formatting(modules, config.test("global"));
+            preprocessing::normalize_domain_id_formatting(modules, !config.test("no-local"));
             let eq_classes = EqClasses::new(modules);
             if config.test("eq") {
                 println!(
@@ -41,6 +41,9 @@ fn main() -> Result<(), ()> {
                 println!("equivalence class error: {:?}", e);
             } else {
                 preprocessing::deanonymize_variables(modules);
+                if config.test("ast2") {
+                    println!("ast after preprocessing: {:#?}", modules);
+                }
                 let module_map_result = statics::ModuleMap::new(modules.iter());
                 match module_map_result {
                     Err(clashing_name) => println!("clashing module name: {:?}", clashing_name),
@@ -60,7 +63,7 @@ fn main() -> Result<(), ()> {
                                 if config.test("dot") {
                                     println!("ontology dot:\n{}", ep.ontology_dot());
                                 }
-                                if config.test("denotation") {
+                                if !config.test("no-deno") {
                                     println!(
                                         "denotation: {:#?}",
                                         dynamics::Executable::denotation(&ep)
