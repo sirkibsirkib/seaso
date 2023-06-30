@@ -19,9 +19,9 @@ static FLAG_DESC_SLICE: &[(&str, &str)] = &[
     ("ast2", "print abstract syntax tree after preprocessing"),
     ("bare", "denotation atoms are not clustered by domain"),
     ("dot", "print GraphViz (.dot) graph ontology of defined domains"),
-    ("eq", "print domain equivlance classes and their representative members"),
+    ("eq", "print domain equivalence classes and their representative members"),
     ("ir", "print the internal representation (used to compute the denotation)"),
-    ("no-local", "do not implicitly localize ('namespace') domains to parts"),
+    ("local", "implicitly localize ('namespace') domains to their parts"),
     ("no-deno", "do not print the program denotation, i.e., truths and unknowns"),
     ("source", "print given Seaso source code after preprocessing"),
 ];
@@ -29,7 +29,7 @@ impl Default for Config {
     fn default() -> Self {
         if std::env::args().find(|s| s == "--help").is_some() {
             println!("Seaso executor help information. Flags:");
-            println!("  --{: <8}  {}", "help", "print this");
+            println!(" --{: <8}  {}", "help", "print this");
             for (name, desc) in FLAG_DESC_SLICE {
                 println!(" --{: <8}  {}", name, desc);
             }

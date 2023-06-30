@@ -24,7 +24,7 @@ fn main() -> Result<(), ()> {
             if config.test("ast1") {
                 println!("ast before preprocessing: {:#?}", parts);
             }
-            preprocessing::normalize_domain_id_formatting(parts, !config.test("no-local"));
+            preprocessing::normalize_domain_id_formatting(parts, config.test("local"));
             let eq_classes = EqClasses::new(parts);
             if config.test("eq") {
                 println!(

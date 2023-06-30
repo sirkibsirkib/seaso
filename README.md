@@ -75,7 +75,7 @@ denotation: Denotation {
 ### CLI options
 Run the tool with flag `--help` to see the optional arguments, used to customize the output.
 
-Some of the arguments change the preprocessor. For example, only _without_ `--no-local` is program `part x { decl a  . }` preprocessed to `part x { decl a@x. }`.
+Some of the arguments change the preprocessor. For example, only with `--local` is program `part x { decl a  . }` preprocessed to `part x { decl a@x. }`.
 
 Most of the arguments change which metadata is printed. For exampe, _with_ `--ast1` and `--ast2`, the abstract syntax tree is printed before and after preprocessing, respectively.  
 
@@ -84,3 +84,4 @@ Most of the arguments change which metadata is printed. For exampe, _with_ `--as
 Source code documentation can be generated with `cargo doc --no-deps`, producing HTML documentation in `target\doc`.
 For extra convenience, run with `cargo doc --no-deps --open` to open the docs in your default browser.
 The repo can be used as a Rust dependency as usual (see `crates.io` for some examples).
+
