@@ -1,0 +1,90 @@
+part basics {
+  decl agent. data. task. plan.
+  defn out(task,data). in(task,data). fun(task,data). arg(task,data).
+       assign(task,agent). read(agent,data).
+  rule in(T,D)   :- fun(T,D).
+       in(T,D)   :- arg(T,D).
+       T,D       :- in(T,D).
+       T,D       :- out(T,D).
+       T,A       :- assign(T,A).
+       A,D       :- read(A,D).
+       read(A,D) :- assign(T,A), in(T,D).
+}
+
+part eq {
+  defn agent_eq(agent,agent). data_eq(data,data).
+  rule agent_eq(A,A) :- A.
+        data_eq(D,D) :- D.
+}
+
+part consistency {
+  <each task must have 0/1 assigned agents>
+  defn two_out(task,agent,agent).
+  rule two_out(T,A1,A2) :- assign(T,A1), assign(T,A2), !agent_eq(A1,A2).
+  emit two_out. seal two_out.
+  <no circular dependencies>
+  defn data_dep(data,data). task_dep(task,task). cyclic_data(data). cyclic_task(task). 
+  rule data_dep(D1,D2) :- in(T,D1), out(T,D2).
+       task_dep(T1,T2) :- out(T1,D), in(T2,D).
+       cyclic_data(D) :- data_dep(D,D).
+       cyclic_task(T) :- task_dep(T,T).
+  emit cyclic_data. cyclic_task.
+  seal cyclic_data. cyclic_task.
+}
+
+part doing {
+  defn to_do(task).
+  rule        T :- to_do(T).
+       to_do(T1) :- to_do(T2), task_dep(T1,T2).
+}
+
+part obligation {
+  <all to_to tasks must be assigned to some agent>
+  defn unassigned(task). assigned(task).
+  rule assigned(T) :- assign(T,A).
+     unassigned(T) :- T, !assigned(T).
+                 T :- to_do(T).      
+  emit unassigned.
+  seal unassigned. assigned. 
+}
+
+part purpose {
+  <all to_do tasks must have a declared purpose>
+  <all assigned tasks must have all their declared purposes permitted>
+  decl purpose.
+  defn declare(purpose,task). permit(purpose,task). declared(task). undeclared(task).
+       prohibited(purpose,task). covers(purpose,purpose).
+  rule P, T, declared(T) :- declare(P,T).
+           undeclared(T) :- T, !declared(T).
+        prohibited(P,T) :- declare(P,T), !permit(P,T), to_do(T).
+        covers(X,Y) :- covers(X,Y), covers(Y,Z).
+        covers(X,X) :- X.
+                  X :- covers(X,X).
+        permit(Q,T) :- permit(P,T), covers(P,Q).
+  emit undeclared. prohibited.
+  seal undeclared. declared. prohibited.
+}
+
+part concrete {
+  defn agent(str). data(str). task(int). purpose(str).
+  rule S :- agent(S).
+       S :- data(S).
+       I :- task(I).
+       S :- purpose(S).
+}
+
+part example {
+  rule 
+    arg(task(0),data("F")).
+    fun(task(0),data("X")).
+    out(task(0),data("FX")).
+
+    arg(task(1),data("FX")).
+    fun(task(1),data("F")).
+    out(task(1),data("FFX")).
+
+    declare(purpose("medicine"),task(0)).
+    covers(purpose("science"),purpose("medicine")).
+    permit(purpose("science"),task(0)).
+    to_do(task(1)).
+}
