@@ -83,8 +83,8 @@ part example {
     fun(task(1),data("F")).
     out(task(1),data("FFX")).
 
-    declare(purpose("medicine"),task(0)).
-    covers(purpose("science"),purpose("medicine")).
-    permit(purpose("science"),task(0)).
+    #declare(purpose("medicine"),task(0)).
+    #covers(purpose("science"),purpose("medicine")).
+    #permit(purpose("science"),task(0)).
     to_do(task(1)).
 }
