@@ -99,14 +99,14 @@ pub struct PartName(pub String);
 
 #[derive(Debug, Default)]
 pub struct DomainSealersModifiers {
-    sealers: HashSet<PartName>,
-    modifiers: HashSet<PartName>,
+    pub sealers: HashSet<PartName>,
+    pub modifiers: HashSet<PartName>,
 }
 
 #[derive(Debug)]
 pub struct EqClasses {
-    representatives: HashMap<DomainId, DomainId>,
-    representative_members: HashMap<DomainId, Vec<DomainId>>,
+    pub representatives: HashMap<DomainId, DomainId>,
+    pub representative_members: HashMap<DomainId, Vec<DomainId>>,
 }
 
 #[derive(Debug)]
