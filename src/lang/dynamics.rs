@@ -9,6 +9,8 @@ pub enum Atom {
     Construct { did: DomainId, args: Vec<Atom> },
 }
 
+pub struct Bare<T>(T);
+
 /// A store of atoms, grouped by domain for ease of lookup.
 #[derive(Default, PartialEq, Eq)]
 pub struct Knowledge {
@@ -20,10 +22,10 @@ pub struct Knowledge {
 /// 1. truths and unknowns are disjoint.
 /// 2. emissions are a subset of truths.
 #[derive(Debug)]
-pub struct Denotation {
-    pub truths: Knowledge,
-    pub unknowns: Knowledge,
-    pub emissions: Knowledge,
+pub struct Denotation<T: Debug> {
+    pub truths: T,
+    pub unknowns: T,
+    pub emissions: T,
 }
 
 /// Used internally when concretizing a rule. Conceptually, is a map from VariableId to Atom.
@@ -68,7 +70,7 @@ pub trait Executable {
         }
     }
 
-    fn denotation(&self) -> Denotation {
+    fn denotation(&self) -> Denotation<Knowledge> {
         let mut pos_w = self.starting_facts();
         let mut va = VariableAssignments::default();
         let mut interpretations =
@@ -106,6 +108,13 @@ pub trait Executable {
             let pos = self.big_step_inference(neg, &mut pos_w, &mut va);
             interpretations.push(pos);
         }
+    }
+}
+
+impl Denotation<Knowledge> {
+    pub fn bare(&self) -> Denotation<Bare<&Knowledge>> {
+        let Self { truths, unknowns, emissions } = self;
+        Denotation { truths: Bare(truths), unknowns: Bare(unknowns), emissions: Bare(emissions) }
     }
 }
 
@@ -339,7 +348,7 @@ impl std::fmt::Debug for Atom {
 
 impl std::fmt::Debug for Knowledge {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut did_truths: Vec<(&DomainId, Vec<_>)> = self
+        let mut did_atoms: Vec<(&DomainId, Vec<_>)> = self
             .map
             .iter()
             .filter_map(|(did, set)| {
@@ -354,7 +363,16 @@ impl std::fmt::Debug for Knowledge {
                 }
             })
             .collect();
-        did_truths.sort_by_key(|x| x.0);
-        f.debug_map().entries(did_truths).finish()
+        did_atoms.sort();
+        f.debug_map().entries(did_atoms).finish()
+    }
+}
+
+impl std::fmt::Debug for Bare<&Knowledge> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut did_truths: Vec<_> =
+            self.0.map.values().flat_map(HashSet::iter).map(super::util::NoPretty).collect();
+        did_truths.sort();
+        f.debug_set().entries(did_truths).finish()
     }
 }

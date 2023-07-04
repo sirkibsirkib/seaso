@@ -1,5 +1,8 @@
 # Seaso Executor
 This contains the source code of the Seaso executor, which can be compiled to a standalone executable, or used as a Rust library.
+Seaso is a simple logic programming language.
+In a nutshell, each Seaso program (1) models the facts of a system, (2) prescribes which facts are undesirable, and (3) specifies how the program may be extended.
+Seaso is based on the well-founded semantics by Van Gelder et al, and the underlying design decisions are motivated by its application to data exchange systems.  
 
 ## Executable
 
@@ -23,7 +26,7 @@ Run the Seaso executor, feeding in your source code as standard input. For examp
 
 ### Output
 
-Once the Seaso executor has consumed all standard input, it will parse and check if your Seaso program is well-formed, and if, so, will compute and output its denotation.
+Once the Seaso executor has consumed all standard input, it will parse and check if your Seaso program is well-formed, and if so, will compute and output its denotation.
 The denotation consists of three sets of atoms: _truths_, _unknowns_, and _emissions_.
 Always, truths and unknowns are disjoint, and truths are a superset of emissions.
 Here is an example output resulting from the above usage.
@@ -72,13 +75,7 @@ denotation: Denotation {
 ### CLI options
 Run the tool with flag `--help` to see the optional arguments, used to customize the output.
 
-Some of the arguments change the preprocessor, for example, only _without_ `--no-local` is the former program preprocessed to the latter:
-```seaso
-part x { decl   x. }
-```
-```seaso
-part x { decl a@x. }
-```
+Some of the arguments change the preprocessor. For example, only with `--local` is program `part x { decl a  . }` preprocessed to `part x { decl a@x. }`.
 
 Most of the arguments change which metadata is printed. For exampe, _with_ `--ast1` and `--ast2`, the abstract syntax tree is printed before and after preprocessing, respectively.  
 
@@ -87,3 +84,4 @@ Most of the arguments change which metadata is printed. For exampe, _with_ `--as
 Source code documentation can be generated with `cargo doc --no-deps`, producing HTML documentation in `target\doc`.
 For extra convenience, run with `cargo doc --no-deps --open` to open the docs in your default browser.
 The repo can be used as a Rust dependency as usual (see `crates.io` for some examples).
+

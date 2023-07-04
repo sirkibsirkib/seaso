@@ -1,5 +1,5 @@
 mod config;
-mod lang;
+pub mod lang;
 
 use lang::*;
 use std::collections::HashSet;
@@ -24,7 +24,7 @@ fn main() -> Result<(), ()> {
             if config.test("ast1") {
                 println!("ast before preprocessing: {:#?}", parts);
             }
-            preprocessing::normalize_domain_id_formatting(parts, !config.test("no-local"));
+            preprocessing::normalize_domain_id_formatting(parts, config.test("local"));
             let eq_classes = EqClasses::new(parts);
             if config.test("eq") {
                 println!(
@@ -66,11 +66,13 @@ fn main() -> Result<(), ()> {
                                 if config.test("dot") {
                                     println!("ontology dot:\n{}", ep.ontology_dot());
                                 }
+                                let denotation = dynamics::Executable::denotation(&ep);
                                 if !config.test("no-deno") {
-                                    println!(
-                                        "denotation: {:#?}",
-                                        dynamics::Executable::denotation(&ep)
-                                    );
+                                    if config.test("bare") {
+                                        println!("denotation: {:#?}", denotation.bare());
+                                    } else {
+                                        println!("denotation: {:#?}", denotation);
+                                    }
                                 }
                             }
                             Err(e) => println!("executable error: {:#?}", e),

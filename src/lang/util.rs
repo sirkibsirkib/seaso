@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 /// Newtype that suppresses pretty-printing of the wrapped type.
 /// Useful in avoiding excessive indentation of internals when pretty printing its container.
+#[derive(Ord, PartialOrd, Eq, PartialEq)]
 pub(crate) struct NoPretty<T: Debug>(pub T);
 
 /// Structure used in debug printing. Prints elements separated by commas.
