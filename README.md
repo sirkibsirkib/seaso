@@ -84,4 +84,5 @@ Most of the arguments change which metadata is printed. For exampe, _with_ `--as
 Source code documentation can be generated with `cargo doc --no-deps`, producing HTML documentation in `target\doc`.
 For extra convenience, run with `cargo doc --no-deps --open` to open the docs in your default browser.
 The repo can be used as a Rust dependency as usual (see `crates.io` for some examples).
+For example, you can build a software system that uses this repo to compute the denotation of Seaso programs stored in memory as ASTs (skipping parsing).
 
