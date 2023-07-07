@@ -180,11 +180,6 @@ impl ExecutableProgram {
                 }
                 Statement::Emit(did) => {
                     used.insert(did.clone());
-                    sealers_modifiers
-                        .entry(did.clone())
-                        .or_default()
-                        .modifiers
-                        .insert(part_name.clone());
                     emissive.insert(did.clone());
                 }
                 Statement::Seal(did) => {
