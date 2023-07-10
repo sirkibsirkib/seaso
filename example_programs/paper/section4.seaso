@@ -1,0 +1,100 @@
+part sec4_1_a {
+    decl agent. data. defn transfer(agent,data,agent).
+}
+
+part sec4_1_b: sec4_1_a {
+    defn agent(str). data(str). rule transfer(agent("Alice"),data("Test Data"),agent("Bob")).
+}
+
+part sec4_2_a: sec4_1_b {
+    decl computation. defn involves(computation,data).
+    defn input(computation,data). output(computation,data).
+         function(computation,data). parameter(computation,int,data).
+    rule C, D :- involves(C,D).
+         involves(C,D) :- input(C,D).  input(C,D) :- function(C,D).
+         involves(C,D) :- output(C,D). input(C,D) :- parameter(C,I,D).    
+}
+
+part sec4_2_b: sec4_2_a {
+    decl computation. defn compute(agent,computation).
+}
+
+part sec4_3_a: sec4_2_b {
+    decl workflow. defn task(workflow,computation). rule W, C :- task(W,C).
+    defn goal(workflow,data).                       rule W, D :- goal(W,D).
+}
+
+part sec4_3_b: sec4_3_a {
+    defn planned(task,agent). rule T, A :- planned(T,A).
+}
+
+part sec4_4_a: sec4_3_b {
+    decl context. defn accessor(agent,context). rule A, C :- accessor(A,C).
+    defn consumer(agent,context). provider(agent,context).
+         functionProvider(agent,context). parameterProvider(agent,context).
+    rule accessor(A,C) :- consumer(A,C). provider(A,C) :- functionProvider(A,C).
+         accessor(A,C) :- provider(A,C). provider(A,C) :- parameterProvider(A,C).
+}
+
+part sec4_4_b: sec4_4_a {
+    defn role(str). playRole(agent,role,context).
+    rule playRole(A,role("accessor"),C) :- accessor(A,C).
+         playRole(A,role("consumer"),C) :- consumer(A,C).
+         accessor(A,C) :- playRole(A,role("accessor"),C).
+         consumer(A,C) :- playRole(A,role("consumer"),C).
+}
+
+part sec4_4_c: sec4_4_b {
+    defn computer(agent,context). rule accessor(A,C) :- computer(A,C).
+    rule playRole(A,role("computer"),C) :- computer(A,C).
+         computer(A,C) :- playRole(A,role("computer"),C).
+}
+
+part sec4_4_d: sec4_4_c {
+    defn computation(context). rule computer(A,Ctx) :- compute(A,computation(Ctx)).
+}
+
+part sec4_4_e: sec4_4_d {
+    defn orgA(agent,context). orgB(agent,context).
+    rule consumer(A,C),  functionProvider(A,C) :- orgA(A,C).
+         computer(A,C), parameterProvider(A,C) :- orgB(A,C).
+    seal computer. functionProvider. consumer. parameterProvider.
+}
+
+part sec4_5_a: {
+    defn dataLeak(transfer). emit dataLeak.
+}
+
+part sec4_5_b: {
+    defn happens(compute).   prohibited(happens). emit prohibited.
+    defn isPlanned(happens). notPlanned(happens). emit notPlanned.
+    rule notPlanned(H) :- H, !isPlanned(H). A, C :- happens(compute(A,C)).
+     isPlanned(happens(compute(A,C))) :- happens(compute(A,C)), planned(task(W,C),A).
+     prohibited(happens(compute(A,computation(Ctx)))) :- happens(compute(A,computation(Ctx))), !computer(A,Ctx).
+    seal isPlanned. notPlanned. prohibited.
+}
+
+part sec4_6_a {
+    defn context(str). workflow(str).
+    rule orgB(agent("Amy"),context("DataMarketCtx")).
+         happens(compute(agent("Amy"),computation(context("DataMarketCtx")))).
+}
+
+part sec4_6_b {
+    rule planned(task(workflow("AmyWorkflow"),C),agent("Amy")) :- C.
+}
+
+part sec4_6_c {
+    defn before(compute,compute). inform(computation,computation). 
+    rule before(X,Z) :- before(X,Y), before(Y,Z).
+         inform(X,Z) :- inform(X,Y), inform(Y,Z).
+         inform(C1,C2) :- output(C1,D), input(C2,D).   
+    defn violatesWorkflow(agent,workflow). emit violatesWorkflow.
+    rule violatesWorkflow(A1,W) :- before(compute(A1,C1),compute(A2,C2)),
+                      inform(C2,C1), task(W,C1), happens(compute(A1,C1)), 
+                                     task(W,C2), happens(compute(A2,C2)).
+}
+
+part sec4_6_d {
+    defn informCycle(computation). rule informCycle(C) :- inform(C,C). emit informCycle.
+}
