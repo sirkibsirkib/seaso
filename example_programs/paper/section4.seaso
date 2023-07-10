@@ -66,12 +66,12 @@ part sec4_5_a: {
 }
 
 part sec4_5_b: {
-    defn happens(compute).   prohibited(happens). emit prohibited.
-    defn isPlanned(happens). notPlanned(happens). emit notPlanned.
-    rule notPlanned(H) :- H, !isPlanned(H). A, C :- happens(compute(A,C)).
-     isPlanned(happens(compute(A,C))) :- happens(compute(A,C)), planned(task(W,C),A).
-     prohibited(happens(compute(A,computation(Ctx)))) :- happens(compute(A,computation(Ctx))), !computer(A,Ctx).
-    seal isPlanned. notPlanned. prohibited.
+    defn happens(compute). isPlanned(happens). notPlanned(happens). banned(happens).
+    rule A, C :- happens(compute(A,C)). rule notPlanned(H) :- H, !isPlanned(H). 
+     isPlanned(happens(compute(A,C))) :- happens(compute(A,C)), planned(task(W,C),A). 
+     banned(happens(compute(A,computation(Ctx))))
+     :- happens(compute(A,computation(Ctx))), !computer(A,Ctx).
+    emit notPlanned. banned. seal isPlanned. notPlanned. banned.
 }
 
 part sec4_6_a {
