@@ -1,0 +1,24 @@
+part sec5_1 {
+    defn suc(int,int). sum(int,int,int). mul(int,int,int). sub(int,int,int).
+    rule A,B :- suc(A,B). sub(A,B,C) :- sum(C,B,A). sum(A,B,C) :- sum(B,A,C).
+         sum(0,A,A) :- A. sum(A,B,C) :- sum(D,B,E), suc(D,A), suc(E,C).
+         mul(A,0,0) :- A. mul(A,B,C) :- mul(A,D,E), suc(D,B), sum(E,A,C).
+    seal sum. sub. mul.
+}
+
+part sec5_2 {
+    defn next(item,item). items(). notFirst(item). notLast(item). 
+         suc(int,int). idx(item,int). count(int). decl item. 
+    rule I, J, notLast(I), notFirst(J) :- next(I,J).
+         idx(I,0), items() :- I, !notFirst(I).
+         idx(J,B)          :- idx(I,A), next(I,J), suc(A,B).
+         count(B) :- idx(I,A), !notLast(I), suc(A,B). count(0) :- !items().
+    seal items. notFirst. notLast. idx. count. 
+    rule suc(0,1). suc(1,2). suc(2,3). suc(3,4).
+    defn item(str). rule next(item("X"),item("Y")).
+}
+
+part sec5_3 {
+    decl state. defn precedes(state,state). end(state). mayEnd(state).
+    rule mayEnd(S1) :- precedes(S1,S2), end(S2).
+}

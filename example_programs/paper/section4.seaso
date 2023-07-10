@@ -75,9 +75,8 @@ part sec4_5_b: {
 }
 
 part sec4_6_a {
-    defn context(str). workflow(str).
-    rule orgB(agent("Amy"),context("DataMarketCtx")).
-         happens(compute(agent("Amy"),computation(context("DataMarketCtx")))).
+    defn context(str). workflow(str). rule orgB(agent("Amy"),context("MarketCtx")).
+         happens(compute(agent("Amy"),computation(context("MarketCtx")))).
 }
 
 part sec4_6_b {
@@ -96,5 +95,5 @@ part sec4_6_c {
 }
 
 part sec4_6_d {
-    defn informCycle(computation). rule informCycle(C) :- inform(C,C). emit informCycle.
+    defn informSelf(computation). rule informSelf(C) :- inform(C,C). emit informSelf.
 }
