@@ -20,8 +20,8 @@ part sec4_2_b: sec4_2_a {
 }
 
 part sec4_3_a: sec4_2_b {
-    decl workflow. defn task(workflow,computation). rule W, C :- task(W,C).
-    defn goal(workflow,data).                       rule W, D :- goal(W,D).
+    decl workflow. defn task(workflow,computation). result(workflow,data).
+    rule W, C :- task(W,C). rule W, D :- result(W,D).
 }
 
 part sec4_3_b: sec4_3_a {
