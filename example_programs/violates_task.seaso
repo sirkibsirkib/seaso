@@ -1,0 +1,9 @@
+decl agent. computation. data.
+defn task(agent,computation). input(computation,data). output(computation,data). happens(compute). compute(agent,computation).
+defn before(compute,compute). inform(computation,computation). violates_task(agent,task).
+rule before(X,Z) :- before(X,Y), before(Y,Z).
+     inform(X,Z) :- inform(X,Y), inform(Y,Z).
+     inform(C1,C2) :- output(C1,D), input(C2,D).      
+     violates_task(A2,task(W,C2)) :- W, inform(C2,C1), happens(compute(A1,C1)), 
+                before(compute(A1,C1),compute(A2,C2)), happens(compute(A2,C2)).
+emit violatesTask. seal violatesTask. inform.

@@ -58,7 +58,7 @@ part purpose {
            undeclared(T) :- T, !declared(T).
         prohibited(P,T) :- declare(P,T), !permit(P,T), to_do(T).
         covers(X,Y) :- covers(X,Y), covers(Y,Z).
-        covers(X,X) :- X.
+        covers(P,P) :- P.
                   X :- covers(X,X).
         permit(Q,T) :- permit(P,T), covers(P,Q).
   emit undeclared. prohibited.
@@ -83,8 +83,12 @@ part example {
     fun(task(1),data("F")).
     out(task(1),data("FFX")).
 
+    agent("Amy"). agent("Bob").
+
     #declare(purpose("medicine"),task(0)).
     #covers(purpose("science"),purpose("medicine")).
     #permit(purpose("science"),task(0)).
     to_do(task(1)).
+
+    seal covers. read. agent. agent_eq.
 }

@@ -3,7 +3,7 @@ part entities {
   defn agent_eq(agent,agent). data_eq(data,data).
   rule
     agent_eq(A,A) :- A.
-    data_eq(D,D) :- D.
+    data_eq(D,D)  :- D.
   seal agent_eq. data_eq.
 }
 

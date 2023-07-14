@@ -1,0 +1,52 @@
+part main {
+	decl agent. data. task. label.
+	defn own(agent,data). assLabel(data,label). checker(agent).
+	     claim(agent,assLabel). compute(agent,task).
+	     output(task,data). valid(claim). input(task,data).
+	     badCompute(compute).
+	     taskInvolves(task,checker).
+	     dataInvolves(data,checker).
+	     uninvolve(data,checker).
+	     uninvolveLabel(label,checker).
+	     checkOk(checker,compute).
+	     insufficientlyCheckOkd(compute).
+	     ownedData(data). unownedData(data).
+	emit badCompute. unownedData. twoComputers.
+	< Two things we are missing
+	- how do data thingies get new labels (see: claim)
+	- abstract compute + inferred checkOk
+	>
+
+	rule own(A,D) :- compute(A,T), output(T,D), !badCompute(compute(A,T)).
+	     Al :- valid(claim(A,Al)).
+         valid(claim(A,assLabel(D,L))) :- claim(A,assLabel(D,L)), own(A,D).
+         badCompute(compute(A,T)) :- compute(A,T), insufficientlyCheckOkd(compute(A,T)).
+         taskInvolves(T,C) :- input(T,D),  dataInvolves(D,C), !uninvolve(D,C).
+         dataInvolves(D,C) :- output(T,D), taskInvolves(T,C).
+         uninvolve(D,C) :- uninvolveLabel(L,C), assLabel(D,L).
+         checkOk(checker(A),compute(A,T)) :- T, checker(A).
+         insufficientlyCheckOkd(compute(A,T)) :- A, taskInvolves(T,C), !checkOk(C,compute(A,T)).
+         dataInvolves(D,checker(A)) :- own(A,D).
+         A :- checker(A).
+         ownedData(D) :- own(A,D).
+         unownedData(D) :- D, !ownedData(D).
+}
+
+part eg: main {
+	defn agent(str). data(str). task(str). label(str).
+	rule agent("Bob"). data("X"). data("Y"). data("Z"). checker(agent("Amy")).
+	     task("1"). task("2"). label("Neat").
+	     compute(agent("Amy"),task("1")). #mayAccess(agent("Amy"),data("X")).
+	     own(agent("Amy"),data("X")).
+	     own(agent("Amy"),data("Y")).
+	     uninvolve(data("Y"),checker(agent("Amy"))).
+	     #uninvolve(data("X"),checker(agent("Amy"))).
+	     input(task("1"),data("X")).
+	     output(task("1"),data("Y")).
+	     input(task("2"),data("Y")).
+	     output(task("2"),data("Z")).
+	     compute(agent("Bob"),task("2")).
+	     claim(agent("Bob"),assLabel(data("Y"),label("Neat"))).
+
+
+}

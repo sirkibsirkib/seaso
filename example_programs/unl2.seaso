@@ -1,0 +1,40 @@
+part agents_and_data {
+  defn agent(str). data(str). agent_eq(agent,agent).
+  rule agent_eq(A,A) :- A.
+}
+
+part roles {
+  defn consumer(agent). third_party(agent). producer(agent).
+       some_consumer(). aggregator(agent).
+  rule A :- producer(A).
+       A, aggregator(A) :- third_party(A), !some_consumer().
+       A, aggregator(A), some_consumer() :- consumer(A).
+  seal aggregator.
+}
+
+part computation {
+  defn agg_compute(data). local_compute(data).
+}
+
+part consistent {
+  <no two consumers>
+  defn two_consumers(agent,agent).
+  rule two_consumers(A1,A2) :- consumer(A1), consumer(A2), !agent_eq(A1,A2).
+}
+
+part to_do {
+  <always some consumer>
+  <unique consumers>
+  <consumer must define purpose>
+  <producer must agree to purpose>
+  <implicitly granted purpose>
+  <privacy until TTP>
+}
+
+part scenario {
+  rule
+    producer(agent("UvA")). 
+    producer(agent("TUD")). 
+    consumer(agent("Bob")). 
+    third_party(agent("SURF")).
+}
