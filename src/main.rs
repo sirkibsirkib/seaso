@@ -66,12 +66,15 @@ fn main() -> Result<(), ()> {
                                 if config.test("dot") {
                                     println!("ontology dot:\n{}", ep.ontology_dot());
                                 }
-                                let denotation = dynamics::Executable::denotation(&ep);
+                                let denotation_res = dynamics::Executable::denotation(&ep);
                                 if !config.test("no-deno") {
                                     if config.test("bare") {
-                                        println!("denotation: {:#?}", denotation.bare());
+                                        println!(
+                                            "denotation: {:#?}",
+                                            denotation_res.denotation.bare()
+                                        );
                                     } else {
-                                        println!("denotation: {:#?}", denotation);
+                                        println!("denotation: {:#?}", denotation_res.denotation);
                                     }
                                 }
                             }

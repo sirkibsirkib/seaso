@@ -3,7 +3,7 @@ part sec4_1_a {
 }
 
 part sec4_1_b: sec4_1_a {
-    defn agent(str). data(str). rule transfer(agent("Alice"),data("Test Data"),agent("Bob")).
+    defn agent(str). data(str). rule transfer(agent("Alice"),data("Sensor Test Data"),agent("Bob")).
 }
 
 part sec4_2_a: sec4_1_b {
@@ -25,7 +25,7 @@ part sec4_3_a: sec4_2_b {
 }
 
 part sec4_3_b: sec4_3_a {
-    defn planned(task,agent). rule T, A :- planned(T,A).
+    defn plan(task,agent). rule T, A :- plan(T,A).
 }
 
 part sec4_4_a: sec4_3_b {
@@ -66,12 +66,12 @@ part sec4_5_a: {
 }
 
 part sec4_5_b: {
-    defn happens(compute). isPlanned(happens). notPlanned(happens). banned(happens).
-    rule A, C :- happens(compute(A,C)). rule notPlanned(H) :- H, !isPlanned(H). 
-     isPlanned(happens(compute(A,C))) :- happens(compute(A,C)), planned(task(W,C),A). 
+    defn happens(compute). planned(happens). unplanned(happens). banned(happens).
+    rule A, C :- happens(compute(A,C)). rule unplanned(H) :- H, !planned(H). 
+     planned(happens(compute(A,C))) :- happens(compute(A,C)), plan(task(W,C),A). 
      banned(happens(compute(A,computation(Ctx))))
      :- happens(compute(A,computation(Ctx))), !computer(A,Ctx).
-    emit notPlanned. banned. seal isPlanned. notPlanned. banned.
+    emit unplanned. banned. seal planned. unplanned. banned.
 }
 
 part sec4_6_a {
@@ -80,7 +80,7 @@ part sec4_6_a {
 }
 
 part sec4_6_b {
-    rule planned(task(workflow("AmyWorkflow"),C),agent("Amy")) :- C.
+    rule plan(task(workflow("AmyWorkflow"),C),agent("Amy")) :- C.
 }
 
 part sec4_6_c {

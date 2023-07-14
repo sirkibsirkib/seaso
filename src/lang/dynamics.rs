@@ -21,6 +21,10 @@ pub struct Knowledge {
 /// Invariants:
 /// 1. truths and unknowns are disjoint.
 /// 2. emissions are a subset of truths.
+pub struct DenotationResult {
+    pub denotation: Denotation<Knowledge>,
+    pub prev_truths: Knowledge,
+}
 #[derive(Debug)]
 pub struct Denotation<T: Debug> {
     pub truths: T,
@@ -47,20 +51,18 @@ pub enum ComplementKnowledge<'a> {
     ComplementOf(&'a Knowledge),
 }
 
-pub trait Executable {
-    fn annotated_rules(&self) -> &[AnnotatedRule];
-    fn emissive(&self, did: &DomainId) -> bool;
-    fn starting_facts(&self) -> Knowledge;
+impl ExecutableProgram {
     fn big_step_inference(
         &self,
         neg: ComplementKnowledge,
         pos_w: &mut Knowledge,
         va: &mut VariableAssignments,
     ) -> Knowledge {
-        let mut pos_r = self.starting_facts();
+        let mut pos_r = Knowledge::default(); // self.starting_facts();
         loop {
-            for AnnotatedRule { v2d, rule } in self.annotated_rules() {
-                rule.inference_stage(v2d, neg, &pos_r, pos_w, va)
+            // let mut visit_fn = |did, atom, _| drop(pos_w.insert(did, atom));
+            for AnnotatedRule { v2d, rule } in &self.annotated_rules {
+                rule.visit_concretized(v2d, neg, &pos_r, pos_w, va)
             }
             let changed = pos_r.absorb_all(pos_w);
             if !changed {
@@ -70,8 +72,8 @@ pub trait Executable {
         }
     }
 
-    fn denotation(&self) -> Denotation<Knowledge> {
-        let mut pos_w = self.starting_facts();
+    pub fn denotation(&self) -> DenotationResult {
+        let mut pos_w = Knowledge::default(); // self.starting_facts();
         let mut va = VariableAssignments::default();
         let mut interpretations =
             vec![self.big_step_inference(ComplementKnowledge::Empty, &mut pos_w, &mut va)];
@@ -79,9 +81,10 @@ pub trait Executable {
             if interpretations.len() % 2 == 1 {
                 if let [.., a, b, c, d] = interpretations.as_mut_slice() {
                     if a == c && b == d {
+                        // this is it!
                         use std::mem::take;
-                        let truths = take(d);
-                        let mut unknowns = take(c);
+                        let [mut unknowns, _, prev_truths, truths] =
+                            [take(a), take(b), take(c), take(d)];
                         for (did, set) in unknowns.map.iter_mut() {
                             set.retain(|atom| !truths.contains(did, atom))
                         }
@@ -90,7 +93,7 @@ pub trait Executable {
                                 .map
                                 .iter()
                                 .filter_map(|(did, set)| {
-                                    if self.emissive(did) {
+                                    if self.emissive.contains(did) {
                                         Some((did.clone(), set.clone()))
                                     } else {
                                         None
@@ -98,7 +101,8 @@ pub trait Executable {
                                 })
                                 .collect(),
                         };
-                        return Denotation { truths, unknowns, emissions };
+                        let denotation = Denotation { truths, unknowns, emissions };
+                        return DenotationResult { denotation, prev_truths };
                     }
                 }
             }
@@ -119,34 +123,6 @@ impl Denotation<Knowledge> {
 }
 
 //////////////////////////////////////////////////////
-
-impl Executable for ExecutableProgram {
-    fn annotated_rules(&self) -> &[AnnotatedRule] {
-        &self.annotated_rules
-    }
-    fn emissive(&self, did: &DomainId) -> bool {
-        self.emissive.contains(did)
-    }
-    fn starting_facts(&self) -> Knowledge {
-        Default::default()
-    }
-}
-
-impl Executable for (&[Atom], &ExecutableProgram) {
-    fn annotated_rules(&self) -> &[AnnotatedRule] {
-        self.1.annotated_rules()
-    }
-    fn emissive(&self, did: &DomainId) -> bool {
-        self.1.emissive(did)
-    }
-    fn starting_facts(&self) -> Knowledge {
-        let mut k = Knowledge::default();
-        for atom in self.0 {
-            k.insert(atom.domain_id(), atom.clone());
-        }
-        k
-    }
-}
 
 impl ComplementKnowledge<'_> {
     fn contains(self, did: &DomainId, atom: &Atom) -> bool {
@@ -219,12 +195,6 @@ impl Knowledge {
 }
 
 impl Atom {
-    fn domain_id(&self) -> &DomainId {
-        match self {
-            Atom::Construct { did, .. } => did,
-            Atom::Constant { c } => c.domain_id(),
-        }
-    }
     fn uniquely_assign_variables(
         &self,
         ra: &RuleAtom,
@@ -268,25 +238,27 @@ impl RuleAtom {
 }
 
 impl Rule {
-    fn inference_stage(
+    fn visit_concretized(
         &self,
         v2d: &VariableTypes,
         neg: ComplementKnowledge,
         pos_r: &Knowledge,
         pos_w: &mut Knowledge,
+        // visit_fn: &mut impl FnMut(&DomainId, Atom, &VariableAssignments),
         va: &mut VariableAssignments,
     ) {
         // println!("inference with va {:?}", va);
-        self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, &self.antecedents);
+        self.visit_concretized_rec(v2d, neg, pos_r, pos_w, va, &self.antecedents);
         va.assignments.clear();
     }
 
-    fn inference_stage_rec(
+    fn visit_concretized_rec(
         &self,
         v2d: &VariableTypes,
         neg: ComplementKnowledge,
         pos_r: &Knowledge,
         pos_w: &mut Knowledge,
+        // visit_fn: &mut impl FnMut(&DomainId, Atom, &VariableAssignments),
         va: &mut VariableAssignments,
         tail: &[RuleLiteral],
     ) {
@@ -307,6 +279,7 @@ impl Rule {
                     for consequent in self.consequents.iter() {
                         let did = consequent.domain_id(v2d).expect("static checked");
                         let atom = consequent.concretize(va).expect("should work");
+                        // visit_fn(did, atom, va);
                         pos_w.insert(&did, atom);
                     }
                 }
@@ -317,12 +290,12 @@ impl Rule {
                     for atom in pos_r.atoms_in_domain(&did) {
                         let state_token = va.get_state_token();
                         if atom.uniquely_assign_variables(&head.ra, va).is_ok() {
-                            self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail)
+                            self.visit_concretized_rec(v2d, neg, pos_r, pos_w, va, new_tail)
                         }
                         va.restore_state(state_token).expect("oh no");
                     }
                 }
-                Sign::Neg => self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, new_tail),
+                Sign::Neg => self.visit_concretized_rec(v2d, neg, pos_r, pos_w, va, new_tail),
             },
         }
     }
