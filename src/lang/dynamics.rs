@@ -39,6 +39,11 @@ pub struct VariableAssignments {
     assignments: Vec<(VariableId, Atom)>,
 }
 
+pub struct Literal {
+    pub sign: Sign,
+    pub atom: Atom,
+}
+
 /// Encodes a snapshot of a growing `VariableAssignments` structure. Used to revert prior states.
 struct StateToken {
     assignments_count: usize,
@@ -50,33 +55,68 @@ pub enum ComplementKnowledge<'a> {
     Empty,
     ComplementOf(&'a Knowledge),
 }
+#[derive(Debug)]
+pub struct ConcreteInference {
+    pub consequent: Atom,
+    pub antecedents: Vec<Literal>,
+}
 
+impl RuleLiteral {
+    fn concretize(&self, va: &VariableAssignments) -> Result<Literal, ()> {
+        self.ra.concretize(va).map(|atom| Literal { sign: self.sign.clone(), atom })
+    }
+}
 impl ExecutableProgram {
+    pub fn how(&self, dr: &DenotationResult) -> Vec<ConcreteInference> {
+        let mut pos_w = Knowledge::default();
+        let mut va = VariableAssignments::default();
+        let mut concrete_inferences = Vec::<ConcreteInference>::default();
+        let neg = ComplementKnowledge::ComplementOf(&dr.prev_truths);
+        let _ = self.big_step_inference(
+            neg,
+            &mut pos_w,
+            &mut va,
+            &mut |va, consequent, antecedents| {
+                concrete_inferences.push(ConcreteInference {
+                    consequent: consequent.concretize(va).unwrap(),
+                    antecedents: antecedents
+                        .iter()
+                        .map(|antecedent| antecedent.concretize(va))
+                        .collect::<Result<Vec<_>, ()>>()
+                        .unwrap(),
+                });
+            },
+        );
+        concrete_inferences
+    }
     fn big_step_inference(
         &self,
         neg: ComplementKnowledge,
         pos_w: &mut Knowledge,
         va: &mut VariableAssignments,
+        visit_inserted: &mut impl FnMut(&VariableAssignments, &RuleAtom, &Vec<RuleLiteral>),
     ) -> Knowledge {
         let mut pos_r = Knowledge::default(); // self.starting_facts();
         loop {
-            // let mut visit_fn = |did, atom, _| drop(pos_w.insert(did, atom));
             for AnnotatedRule { v2d, rule } in &self.annotated_rules {
-                rule.visit_concretized(v2d, neg, &pos_r, pos_w, va)
+                rule.inference_stage(v2d, neg, &pos_r, pos_w, va, visit_inserted)
             }
-            let changed = pos_r.absorb_all(pos_w);
-            if !changed {
-                assert!(pos_w.map.is_empty());
+            if pos_w.is_empty() {
                 return pos_r;
             }
+            pos_r.absorb_disjoint(pos_w);
         }
     }
 
     pub fn denotation(&self) -> DenotationResult {
         let mut pos_w = Knowledge::default(); // self.starting_facts();
         let mut va = VariableAssignments::default();
-        let mut interpretations =
-            vec![self.big_step_inference(ComplementKnowledge::Empty, &mut pos_w, &mut va)];
+        let mut interpretations = vec![self.big_step_inference(
+            ComplementKnowledge::Empty,
+            &mut pos_w,
+            &mut va,
+            &mut |_, _, _| {},
+        )];
         loop {
             if interpretations.len() % 2 == 1 {
                 if let [.., a, b, c, d] = interpretations.as_mut_slice() {
@@ -109,7 +149,7 @@ impl ExecutableProgram {
             let neg = ComplementKnowledge::ComplementOf(interpretations.iter().last().unwrap());
             assert!(pos_w.map.is_empty());
             assert!(va.assignments.is_empty());
-            let pos = self.big_step_inference(neg, &mut pos_w, &mut va);
+            let pos = self.big_step_inference(neg, &mut pos_w, &mut va, &mut |_, _, _| {});
             interpretations.push(pos);
         }
     }
@@ -172,6 +212,9 @@ impl VariableAssignments {
 }
 
 impl Knowledge {
+    pub fn is_empty(&self) -> bool {
+        self.map.values().all(HashSet::is_empty)
+    }
     pub fn atoms_in_domain(&self, did: &DomainId) -> impl Iterator<Item = &Atom> + '_ {
         self.map.get(did).into_iter().flat_map(|set| set.iter())
     }
@@ -181,16 +224,13 @@ impl Knowledge {
     pub fn insert(&mut self, did: &DomainId, atom: Atom) -> bool {
         self.map.entry(did.clone()).or_default().insert(atom)
     }
-    pub fn absorb_all(&mut self, other: &mut Self) -> bool {
-        let mut changed = false;
+    pub fn absorb_disjoint(&mut self, other: &mut Self) {
         for (did, set) in other.map.drain() {
             for atom in set {
-                if self.insert(&did, atom) {
-                    changed = true;
-                }
+                let new = self.insert(&did, atom);
+                assert!(new);
             }
         }
-        changed
     }
 }
 
@@ -238,28 +278,27 @@ impl RuleAtom {
 }
 
 impl Rule {
-    fn visit_concretized(
+    fn inference_stage(
         &self,
         v2d: &VariableTypes,
         neg: ComplementKnowledge,
         pos_r: &Knowledge,
         pos_w: &mut Knowledge,
-        // visit_fn: &mut impl FnMut(&DomainId, Atom, &VariableAssignments),
         va: &mut VariableAssignments,
+        visit_inserted: &mut impl FnMut(&VariableAssignments, &RuleAtom, &Vec<RuleLiteral>),
     ) {
-        // println!("inference with va {:?}", va);
-        self.visit_concretized_rec(v2d, neg, pos_r, pos_w, va, &self.antecedents);
+        self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, visit_inserted, &self.antecedents);
         va.assignments.clear();
     }
 
-    fn visit_concretized_rec(
+    fn inference_stage_rec(
         &self,
         v2d: &VariableTypes,
         neg: ComplementKnowledge,
         pos_r: &Knowledge,
         pos_w: &mut Knowledge,
-        // visit_fn: &mut impl FnMut(&DomainId, Atom, &VariableAssignments),
         va: &mut VariableAssignments,
+        visit_inserted: &mut impl FnMut(&VariableAssignments, &RuleAtom, &Vec<RuleLiteral>),
         tail: &[RuleLiteral],
     ) {
         match tail {
@@ -279,8 +318,11 @@ impl Rule {
                     for consequent in self.consequents.iter() {
                         let did = consequent.domain_id(v2d).expect("static checked");
                         let atom = consequent.concretize(va).expect("should work");
-                        // visit_fn(did, atom, va);
-                        pos_w.insert(&did, atom);
+                        if !pos_r.contains(&did, &atom) {
+                            if pos_w.insert(&did, atom) {
+                                visit_inserted(va, consequent, &self.antecedents);
+                            }
+                        }
                     }
                 }
             }
@@ -290,12 +332,22 @@ impl Rule {
                     for atom in pos_r.atoms_in_domain(&did) {
                         let state_token = va.get_state_token();
                         if atom.uniquely_assign_variables(&head.ra, va).is_ok() {
-                            self.visit_concretized_rec(v2d, neg, pos_r, pos_w, va, new_tail)
+                            self.inference_stage_rec(
+                                v2d,
+                                neg,
+                                pos_r,
+                                pos_w,
+                                va,
+                                visit_inserted,
+                                new_tail,
+                            )
                         }
                         va.restore_state(state_token).expect("oh no");
                     }
                 }
-                Sign::Neg => self.visit_concretized_rec(v2d, neg, pos_r, pos_w, va, new_tail),
+                Sign::Neg => {
+                    self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, visit_inserted, new_tail)
+                }
             },
         }
     }
@@ -309,43 +361,32 @@ impl std::fmt::Debug for Atom {
                 Constant::Str(c) => c.fmt(f),
             },
             Self::Construct { did, args } => {
-                let mut f = f.debug_tuple(&did.0);
-                for arg in args {
-                    f.field(arg);
-                }
-                f.finish()
+                write!(f, "{:?}({:?})", did, crate::util::CommaSep { iter: args, spaced: false })
             }
         }
+    }
+}
+impl std::fmt::Debug for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if let Sign::Neg = self.sign {
+            write!(f, "!")?
+        }
+        self.atom.fmt(f)
     }
 }
 
 impl std::fmt::Debug for Knowledge {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut did_atoms: Vec<(&DomainId, Vec<_>)> = self
-            .map
-            .iter()
-            .filter_map(|(did, set)| {
-                if set.is_empty() {
-                    None
-                } else {
-                    Some({
-                        let mut vec = set.iter().map(super::util::NoPretty).collect::<Vec<_>>();
-                        vec.sort_by_key(|x| x.0);
-                        (did, vec)
-                    })
-                }
-            })
-            .collect();
-        did_atoms.sort();
-        f.debug_map().entries(did_atoms).finish()
+        use crate::util::{map_snd, sorted_vec};
+        let sorted_did_atoms =
+            map_snd(self.map.iter().filter(|(_did, set)| !set.is_empty()), sorted_vec);
+        f.debug_map().entries(sorted_vec(sorted_did_atoms)).finish()
     }
 }
 
 impl std::fmt::Debug for Bare<&Knowledge> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut did_truths: Vec<_> =
-            self.0.map.values().flat_map(HashSet::iter).map(super::util::NoPretty).collect();
-        did_truths.sort();
-        f.debug_set().entries(did_truths).finish()
+        let truths = crate::util::sorted_vec(self.0.map.values().flat_map(HashSet::iter));
+        f.debug_set().entries(truths).finish()
     }
 }

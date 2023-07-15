@@ -11,6 +11,7 @@ part main {
 	     checkOk(checker,compute).
 	     insufficientlyCheckOkd(compute).
 	     ownedData(data). unownedData(data).
+	     twoComputers(data,agent,agent).
 	emit badCompute. unownedData. twoComputers.
 	< Two things we are missing
 	- how do data thingies get new labels (see: claim)
@@ -18,6 +19,8 @@ part main {
 	>
 
 	rule own(A,D) :- compute(A,T), output(T,D), !badCompute(compute(A,T)).
+		 T, D :- input(T,D).
+		 T, D :- output(T,D).
 	     Al :- valid(claim(A,Al)).
          valid(claim(A,assLabel(D,L))) :- claim(A,assLabel(D,L)), own(A,D).
          badCompute(compute(A,T)) :- compute(A,T), insufficientlyCheckOkd(compute(A,T)).
@@ -34,13 +37,12 @@ part main {
 
 part eg: main {
 	defn agent(str). data(str). task(str). label(str).
-	rule agent("Bob"). data("X"). data("Y"). data("Z"). checker(agent("Amy")).
-	     task("1"). task("2"). label("Neat").
-	     compute(agent("Amy"),task("1")). #mayAccess(agent("Amy"),data("X")).
+	rule agent("Bob"). checker(agent("Amy")).
+	     label("Neat").
+	     compute(agent("Amy"),task("1")).
 	     own(agent("Amy"),data("X")).
 	     own(agent("Amy"),data("Y")).
 	     uninvolve(data("Y"),checker(agent("Amy"))).
-	     #uninvolve(data("X"),checker(agent("Amy"))).
 	     input(task("1"),data("X")).
 	     output(task("1"),data("Y")).
 	     input(task("2"),data("Y")).

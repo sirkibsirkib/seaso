@@ -20,6 +20,7 @@ static FLAG_DESC_SLICE: &[(&str, &str)] = &[
     ("bare", "denotation atoms are not clustered by domain"),
     ("dot", "print GraphViz (.dot) graph ontology of defined domains"),
     ("eq", "print domain equivalence classes and their representative members"),
+    ("how", "print the concrete rule antecedents of each truth"),
     ("ir", "print the internal representation (used to compute the denotation)"),
     ("local", "implicitly localize ('namespace') domains to their parts"),
     ("no-deno", "do not print the program denotation, i.e., truths and unknowns"),

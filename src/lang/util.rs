@@ -5,11 +5,6 @@ use core::{
 };
 use std::collections::HashMap;
 
-/// Newtype that suppresses pretty-printing of the wrapped type.
-/// Useful in avoiding excessive indentation of internals when pretty printing its container.
-#[derive(Ord, PartialOrd, Eq, PartialEq)]
-pub(crate) struct NoPretty<T: Debug>(pub T);
-
 /// Structure used in debug printing. Prints elements separated by commas.
 pub(crate) struct CommaSep<'a, T: Debug + 'a, I: IntoIterator<Item = &'a T> + Clone> {
     pub iter: I,
@@ -27,6 +22,19 @@ pub struct VecSetMutGuard<'a, T: Ord> {
 }
 
 /////////////////////////
+
+pub fn map_snd<A, B, C>(
+    iter: impl IntoIterator<Item = (A, B)>,
+    b_to_c: impl Fn(B) -> C,
+) -> impl Iterator<Item = (A, C)> {
+    iter.into_iter().map(move |(a, b)| (a, b_to_c(b)))
+}
+
+pub fn sorted_vec<T: Ord>(iter: impl IntoIterator<Item = T>) -> Vec<T> {
+    let mut vec: Vec<T> = iter.into_iter().collect();
+    vec.sort();
+    vec
+}
 
 pub fn collect_map_lossless<K: Copy + Eq + Hash, V, I: IntoIterator<Item = (K, V)>>(
     iter: I,
@@ -101,12 +109,6 @@ impl<T: Ord> FromIterator<T> for VecSet<T> {
             x.insert(q);
         }
         x
-    }
-}
-
-impl<T: Debug> Debug for NoPretty<T> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?}", &self.0)
     }
 }
 
