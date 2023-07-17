@@ -1,0 +1,6 @@
+decl task. data. taskVar. dataVar.
+defn input(task,data). inputVar(taskVar,dataVar).
+
+defn taskAssign(task,taskVar). taskDataAssign(taskAssign,dataVar,data).
+rule taskAssign(T,Tv) :- T, Tv.
+     taskDataAssign(taskAssign(T,Tv))
