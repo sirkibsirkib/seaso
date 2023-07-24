@@ -1,0 +1,8 @@
+<now focusing on labelling: the part Brane MUST run>
+
+decl task. agent. data.
+defn label(agent,str). seal label.
+defn worker(task,agent). out(task,data). parameter(task,data).
+     function(task,data). injects(agent,data).
+
+defn task_label(task,label). agent_label(agent,label). agent_label(agent,label).
