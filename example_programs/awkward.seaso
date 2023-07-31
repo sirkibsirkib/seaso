@@ -1,5 +1,12 @@
-# formalize: nonempty iff. there are no items
-decl item.
-defn nonEmpty(). item2(item).
-rule item2(I) :- I.
-     nonEmpty() :- item2(I).
+# formalize: non-empty iff. there are some items
+decl item. defn nonEmpty().
+
+# this would be ambiguous; `I` has unknown type!
+# rule nonEmpty() :- I.
+
+# this is a workaround
+defn bogus(item).
+rule nonEmpty(), bogus(I) :- I.
+
+# this would be ideal
+# defn nonEmpty() :- I:int. 

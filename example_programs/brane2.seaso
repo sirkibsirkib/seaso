@@ -1,0 +1,49 @@
+decl agent. task. suffix.
+defn data(agent,suffix). gotSource(data). missingSource(data).
+     source(data,task). twoSources(data). taskId(task,task).
+     taskInvolved(task,agent). dataInvolved(data,agent). 
+     input(task,data). output(task,data). taskHasOutput(task).
+     uninvolveTask(task,agent).
+     madeExist(task,agent). exists(data). randoMadeExist(task,agent).
+     madeExistBeforeOutput(task,agent).
+     worker(task,agent).
+     someWorker(task). noWorker(task).
+
+<
+function: source
+`input` is somehow traversible and hardcoded
+worker is a partial function
+worker has an output if the output exists
+>
+
+emit missingSource. twoSources. noWorker. randoMadeExist. madeExistBeforeOutput.
+
+rule exists(D) :- madeExist(T,A), output(T,D).
+     madeExistBeforeOutput(T,A) :- madeExist(T,A), !taskHasOutput(T).
+     taskHasOutput(T) :- output(T,D).
+rule randoMadeExist(T,A) :- madeExist(T,A), !worker(T,A).
+rule taskId(T,T) :- T.
+rule source(D,T) :- output(T,D).
+rule gotSource(D) :- source(D,T).
+     missingSource(D) :- exists(D), !gotSource(D).
+     twoSources(D) :- source(D,T1), source(D,T2), !taskId(T1,T2).
+rule taskInvolved(T,A) :- dataInvolved(D,A), input(T,D), !uninvolveTask(T,A).
+rule taskInvolved(T,A) :- worker(T,A), !uninvolveTask(T,A).
+rule dataInvolved(D,A) :- taskInvolved(T,A), output(T,D).
+rule someWorker(T) :- worker(T,A).
+     noWorker(T) :- T, !someWorker(T).
+seal gotSource. missingSource. twoSources. taskId. source. exists.
+     randoMadeExist. madeExistBeforeOutput. noWorker. suffix.
+
+<
+uninvolveTask(T,A) is postulated by A
+output(T,data(A,I)) is postulated by A
+madeExist(T,A) is postulated by A
+>
+
+part eg {
+	defn agent(str). task(str). suffix(str).
+	rule
+	  task("amy,X=()").
+	  output(task("amy,X=()"),data(agent("amy"),suffix("X"))).
+}
