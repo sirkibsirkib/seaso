@@ -12,7 +12,7 @@ pub enum Atom {
 pub struct Bare<T>(T);
 
 /// A store of atoms, grouped by domain for ease of lookup.
-#[derive(Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct Knowledge {
     pub map: HashMap<DomainId, HashSet<Atom>>,
 }
@@ -119,15 +119,18 @@ impl ExecutableProgram {
         )];
         loop {
             if interpretations.len() % 2 == 1 {
-                if let [.., a, b, c, d] = interpretations.as_mut_slice() {
-                    if a == c && b == d {
+                if let [.., a, b, c] = interpretations.as_mut_slice() {
+                    if a == c {
                         // this is it!
                         use std::mem::take;
-                        let [mut unknowns, _, prev_truths, truths] =
-                            [take(a), take(b), take(c), take(d)];
-                        for (did, set) in unknowns.map.iter_mut() {
-                            set.retain(|atom| !truths.contains(did, atom))
-                        }
+                        let [prev_truths, truths] = [take(b), take(c)];
+                        let unknowns = {
+                            let mut unknowns = prev_truths.clone();
+                            for (did, set) in unknowns.map.iter_mut() {
+                                set.retain(|atom| !truths.contains(did, atom))
+                            }
+                            unknowns
+                        };
                         let emissions = Knowledge {
                             map: truths
                                 .map
