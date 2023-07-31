@@ -1,3 +1,5 @@
+# This encodes a simplified version of the illustrative
+# examples from the well-founded semantics paper.
 rule 1 :- !2, 3.
      2 :- !1.
      3.
