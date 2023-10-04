@@ -174,7 +174,6 @@ impl ExecutableProgram {
                     })?;
 
                     let mut handle_consequent = |ra: &RuleAtom| {
-                        println!("<<RULE {:?} with CONSEQUENT {:?}>>", rule, ra);
                         if !rule.contains_pos_antecedent(ra, executable_config.subconsequence) {
                             let did = ra.domain_id(&v2d).expect("WAH");
                             sealers_modifiers
