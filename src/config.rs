@@ -27,15 +27,15 @@ static FLAG_DESC_SLICE: &[(&str, &str)] = &[
     ("no-deno", "do not print the program denotation, i.e., truths and unknowns"),
     ("source", "print given Seaso source code after preprocessing"),
     ("save", "preprocess rules s.t. they are safe by adding consequent-only variables as positive antecedents"),
-    ("subconsequence", "rules implicitly infer all consequents' subconsequents"),
+    ("sub", "rules implicitly infer all consequents' subconsequents"),
 ];
 impl Default for Config {
     fn default() -> Self {
         if std::env::args().find(|s| s == "--help").is_some() {
             println!("Seaso executor help information. Flags:");
-            println!(" --{: <8}  {}", "help", "print this");
+            println!(" --{: <9}  {}", "help", "print this");
             for (name, desc) in FLAG_DESC_SLICE {
-                println!(" --{: <8}  {}", name, desc);
+                println!(" --{: <9}  {}", name, desc);
             }
             std::process::exit(0);
         }
@@ -64,6 +64,6 @@ impl Default for Config {
 
 impl Config {
     pub fn executable_config(&self) -> ExecutableConfig {
-        ExecutableConfig { subconsequence: self.test("subconsequence") }
+        ExecutableConfig { subconsequence: self.test("sub") }
     }
 }
