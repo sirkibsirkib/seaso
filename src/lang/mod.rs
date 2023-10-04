@@ -110,6 +110,11 @@ pub struct EqClasses {
 }
 
 #[derive(Debug)]
+pub struct ExecutableConfig {
+    pub(crate) infer_sub_consequents: bool,
+}
+
+#[derive(Debug)]
 pub struct ExecutableProgram {
     pub(crate) dd: DomainDefinitions,
     pub(crate) annotated_rules: Vec<AnnotatedRule>,
@@ -117,4 +122,5 @@ pub struct ExecutableProgram {
     pub(crate) sealers_modifiers: HashMap<DomainId, DomainSealersModifiers>,
     pub(crate) declared_undefined: HashSet<DomainId>,
     pub(crate) used_undeclared: HashSet<DomainId>,
+    pub(crate) executable_config: ExecutableConfig,
 }

@@ -24,6 +24,9 @@ fn main() -> Result<(), ()> {
             if config.test("ast1") {
                 println!("ast before preprocessing: {:#?}", parts);
             }
+            if config.test("save") {
+                preprocessing::add_antecedent_variables_as_pos_literals(parts);
+            }
             preprocessing::normalize_domain_id_formatting(parts, config.test("local"));
             let eq_classes = EqClasses::new(parts);
             if config.test("eq") {
@@ -50,7 +53,7 @@ fn main() -> Result<(), ()> {
                     Ok(part_map) => {
                         let dumn = part_map.depended_undefined_names().collect::<HashSet<_>>();
                         println!("dependend undefined parts: {:?}", dumn);
-                        let ep = ExecutableProgram::new(&part_map);
+                        let ep = ExecutableProgram::new(&part_map, config.executable_config());
                         if config.test("ir") {
                             println!("internal representation: {:#?}", ep);
                         }

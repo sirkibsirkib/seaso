@@ -128,7 +128,10 @@ impl ExecutableProgram {
     pub fn is_sealed(&self, did: &DomainId) -> bool {
         self.sealers_modifiers.get(did).map(|dsm| !dsm.sealers.is_empty()).unwrap_or(false)
     }
-    pub fn new<'a>(part_map: &'a PartMap<'a>) -> Result<Self, ExecutableError<'a>> {
+    pub fn new<'a>(
+        part_map: &'a PartMap<'a>,
+        executable_config: ExecutableConfig,
+    ) -> Result<Self, ExecutableError<'a>> {
         // pass 1: domain definitions
         let mut dd = DomainDefinitions::default();
         for (part_name, statement) in Self::part_statements(part_map) {
@@ -169,7 +172,12 @@ impl ExecutableProgram {
                     let v2d = rule.rule_type_variables(&dd).map_err(|err| {
                         ExecutableError::ExecutableRuleError { part_name, rule, err }
                     })?;
-                    for did in rule.consequents.iter().map(|x| x.domain_id(&v2d).expect("WAH")) {
+                    for did in rule
+                        .consequents
+                        .iter()
+                        .filter(|&ra| !rule.contains_pos_antecedent(ra))
+                        .map(|x| x.domain_id(&v2d).expect("WAH"))
+                    {
                         sealers_modifiers
                             .entry(did.clone())
                             .or_default()
@@ -214,11 +222,47 @@ impl ExecutableProgram {
             sealers_modifiers,
             declared_undefined,
             used_undeclared,
+            executable_config,
         })
     }
 }
 
 impl Rule {
+    pub fn consequent_variables(&self) -> HashSet<VariableId> {
+        let mut set = HashSet::<VariableId>::default();
+        let visitor = &mut |ra: &RuleAtom| {
+            if let RuleAtom::Variable(vid) = ra {
+                set.insert(vid.clone());
+            }
+        };
+        for consequent in &self.consequents {
+            consequent.visit_subatoms(visitor);
+        }
+        set
+    }
+    pub fn is_enumerable_variable(&self, vid: &VariableId) -> bool {
+        let mut found = false;
+        let visitor = &mut |ra: &RuleAtom| {
+            if let RuleAtom::Variable(vid2) = ra {
+                if vid == vid2 {
+                    found = true;
+                }
+            }
+        };
+
+        for antecedent in &self.antecedents {
+            if antecedent.sign == Sign::Pos {
+                antecedent.ra.visit_subatoms(visitor);
+            }
+        }
+        found
+    }
+    fn contains_pos_antecedent(&self, ra: &RuleAtom) -> bool {
+        self.antecedents
+            .iter()
+            .find(|rule_literal| rule_literal.sign == Sign::Pos && &rule_literal.ra == ra)
+            .is_some()
+    }
     pub fn split_consequents(&self) -> impl Iterator<Item = Self> + '_ {
         self.consequents.iter().map(|consequent| Self {
             consequents: vec![consequent.clone()],
@@ -293,6 +337,14 @@ impl Constant {
 }
 
 impl RuleAtom {
+    fn visit_subatoms<'a, 'b>(&'a self, visitor: &'b mut impl FnMut(&'a Self)) {
+        visitor(self);
+        if let Self::Construct { args, .. } = self {
+            for arg in args {
+                arg.visit_subatoms(visitor)
+            }
+        }
+    }
     fn occurring_dids(&self, dids: &mut HashSet<DomainId>) {
         if let RuleAtom::Construct { did, args } = self {
             dids.insert(did.clone());

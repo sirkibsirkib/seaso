@@ -1,0 +1,3 @@
+defn agent(str). task(int). plan(task,agent). exist(agent).
+rule plan(task(1),agent("Amy")).
+     exist(A).

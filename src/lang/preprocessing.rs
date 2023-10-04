@@ -17,8 +17,26 @@ pub struct EquatePrimitivesError<'a> {
 }
 
 ////////////////
+
+pub fn add_antecedent_variables_as_pos_literals(parts: &mut [Part]) {
+    for part in parts {
+        let mut guard = part.statements.as_vec_mut();
+        for statement in guard.as_mut().iter_mut() {
+            if let Statement::Rule(rule) = statement {
+                let consequent_vids = rule.consequent_variables();
+                for vid in consequent_vids {
+                    if !rule.is_enumerable_variable(&vid) {
+                        rule.antecedents
+                            .push(RuleLiteral { ra: RuleAtom::Variable(vid), sign: Sign::Pos });
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub fn normalize_domain_id_formatting(parts: &mut [Part], localize: bool) {
-    for part in parts.iter_mut() {
+    for part in parts {
         let mut guard = part.statements.as_vec_mut();
         for statement in guard.as_mut().iter_mut() {
             let mut clos = |did: &mut DomainId| {

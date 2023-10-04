@@ -1,3 +1,4 @@
+use crate::lang::ExecutableConfig;
 use std::collections::{HashMap, HashSet};
 
 pub struct Config {
@@ -25,6 +26,8 @@ static FLAG_DESC_SLICE: &[(&str, &str)] = &[
     ("local", "implicitly localize ('namespace') domains to their parts"),
     ("no-deno", "do not print the program denotation, i.e., truths and unknowns"),
     ("source", "print given Seaso source code after preprocessing"),
+    ("save", "preprocess rules s.t. they are safe by adding consequent-only variables as positive antecedents"),
+    ("infer-sub-consequents", "rules implicitly infer all consequents' subconsequents, also"),
 ];
 impl Default for Config {
     fn default() -> Self {
@@ -56,5 +59,11 @@ impl Default for Config {
             })
             .collect();
         Self { present_flag_names, defined_flag_name_to_description }
+    }
+}
+
+impl Config {
+    pub fn executable_config(&self) -> ExecutableConfig {
+        ExecutableConfig { infer_sub_consequents: self.test("infer-sub-consequents") }
     }
 }

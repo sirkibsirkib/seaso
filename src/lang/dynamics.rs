@@ -99,7 +99,15 @@ impl ExecutableProgram {
         let mut pos_r = Knowledge::default(); // self.starting_facts();
         loop {
             for AnnotatedRule { v2d, rule } in &self.annotated_rules {
-                rule.inference_stage(v2d, neg, &pos_r, pos_w, va, visit_inserted)
+                rule.inference_stage(
+                    v2d,
+                    neg,
+                    &pos_r,
+                    pos_w,
+                    va,
+                    visit_inserted,
+                    &self.executable_config,
+                )
             }
             if pos_w.is_empty() {
                 return pos_r;
@@ -238,6 +246,12 @@ impl Knowledge {
 }
 
 impl Atom {
+    fn domain_id(&self) -> &DomainId {
+        match self {
+            Self::Constant { c } => c.domain_id(),
+            Self::Construct { did, .. } => did,
+        }
+    }
     fn uniquely_assign_variables(
         &self,
         ra: &RuleAtom,
@@ -262,7 +276,17 @@ impl Atom {
                     Err(())
                 }
             }
-            (x, y) => panic!("{:?}", (x, y)),
+            (x, y) => panic!("bad concretisation {:?} given {:?}", (x, y), va),
+        }
+    }
+
+    fn collect_subatoms<'a>(&'a self, set: &mut HashSet<&'a Self>) {
+        if set.insert(self) {
+            if let Self::Construct { args, .. } = self {
+                for arg in args {
+                    arg.collect_subatoms(set)
+                }
+            }
         }
     }
 }
@@ -289,8 +313,18 @@ impl Rule {
         pos_w: &mut Knowledge,
         va: &mut VariableAssignments,
         visit_inserted: &mut impl FnMut(&VariableAssignments, &RuleAtom, &Vec<RuleLiteral>),
+        executable_config: &ExecutableConfig,
     ) {
-        self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, visit_inserted, &self.antecedents);
+        self.inference_stage_rec(
+            v2d,
+            neg,
+            pos_r,
+            pos_w,
+            va,
+            visit_inserted,
+            &self.antecedents,
+            executable_config,
+        );
         va.assignments.clear();
     }
 
@@ -303,6 +337,7 @@ impl Rule {
         va: &mut VariableAssignments,
         visit_inserted: &mut impl FnMut(&VariableAssignments, &RuleAtom, &Vec<RuleLiteral>),
         tail: &[RuleLiteral],
+        executable_config: &ExecutableConfig,
     ) {
         match tail {
             [] => {
@@ -319,11 +354,25 @@ impl Rule {
                 if checks_pass {
                     // all checks passed
                     for consequent in self.consequents.iter() {
-                        let did = consequent.domain_id(v2d).expect("static checked");
                         let atom = consequent.concretize(va).expect("should work");
-                        if !pos_r.contains(&did, &atom) {
-                            if pos_w.insert(&did, atom) {
-                                visit_inserted(va, consequent, &self.antecedents);
+
+                        if executable_config.infer_sub_consequents {
+                            let mut subatoms = HashSet::<&Atom>::default();
+                            atom.collect_subatoms(&mut subatoms);
+                            for subatom in subatoms {
+                                let did = subatom.domain_id();
+                                if !pos_r.contains(did, &subatom) {
+                                    if pos_w.insert(did, subatom.clone()) {
+                                        visit_inserted(va, consequent, &self.antecedents);
+                                    }
+                                }
+                            }
+                        } else {
+                            let did = atom.domain_id();
+                            if !pos_r.contains(did, &atom) {
+                                if pos_w.insert(did, atom.clone()) {
+                                    visit_inserted(va, consequent, &self.antecedents);
+                                }
                             }
                         }
                     }
@@ -343,14 +392,22 @@ impl Rule {
                                 va,
                                 visit_inserted,
                                 new_tail,
+                                executable_config,
                             )
                         }
                         va.restore_state(state_token).expect("oh no");
                     }
                 }
-                Sign::Neg => {
-                    self.inference_stage_rec(v2d, neg, pos_r, pos_w, va, visit_inserted, new_tail)
-                }
+                Sign::Neg => self.inference_stage_rec(
+                    v2d,
+                    neg,
+                    pos_r,
+                    pos_w,
+                    va,
+                    visit_inserted,
+                    new_tail,
+                    executable_config,
+                ),
             },
         }
     }
