@@ -1,0 +1,18 @@
+part defns {
+	defn name(str). person(name).
+	seal name.
+}
+
+part normal_breaker {
+	# if subconsequent is
+	# DISABLED => `name` seal is broken.
+	#  ENABLED => no seal break. N must already be a name.
+	rule N :- person(N).
+}
+
+part subconsequent_breaker {
+	# if subconsequent is
+	# DISABLED => no seal break. person is unsealed and name is unchanged. 
+	#  ENABLED => `name` seal is broken; it is an implicit consequent.
+	rule person(name("bob")).
+}

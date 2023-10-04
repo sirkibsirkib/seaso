@@ -172,17 +172,25 @@ impl ExecutableProgram {
                     let v2d = rule.rule_type_variables(&dd).map_err(|err| {
                         ExecutableError::ExecutableRuleError { part_name, rule, err }
                     })?;
-                    for did in rule
-                        .consequents
-                        .iter()
-                        .filter(|&ra| !rule.contains_pos_antecedent(ra))
-                        .map(|x| x.domain_id(&v2d).expect("WAH"))
-                    {
-                        sealers_modifiers
-                            .entry(did.clone())
-                            .or_default()
-                            .modifiers
-                            .insert(part_name.clone());
+
+                    let mut handle_consequent = |ra: &RuleAtom| {
+                        println!("<<RULE {:?} with CONSEQUENT {:?}>>", rule, ra);
+                        if !rule.contains_pos_antecedent(ra, executable_config.subconsequence) {
+                            let did = ra.domain_id(&v2d).expect("WAH");
+                            sealers_modifiers
+                                .entry(did.clone())
+                                .or_default()
+                                .modifiers
+                                .insert(part_name.clone());
+                        }
+                    };
+                    for consequent in &rule.consequents {
+                        if executable_config.subconsequence {
+                            // sub-conseuquents are treated as consequents
+                            consequent.visit_subatoms(&mut handle_consequent);
+                        } else {
+                            handle_consequent(consequent)
+                        }
                     }
                     annotated_rules.push(AnnotatedRule { v2d, rule: rule.clone() })
                 }
@@ -257,11 +265,22 @@ impl Rule {
         }
         found
     }
-    fn contains_pos_antecedent(&self, ra: &RuleAtom) -> bool {
-        self.antecedents
-            .iter()
-            .find(|rule_literal| rule_literal.sign == Sign::Pos && &rule_literal.ra == ra)
-            .is_some()
+    fn contains_pos_antecedent(&self, ra: &RuleAtom, subconsequence: bool) -> bool {
+        let mut pos_antecedent_ras =
+            self.antecedents.iter().filter(|x| x.sign == Sign::Pos).map(|x| &x.ra);
+        if subconsequence {
+            let mut found = false;
+            pos_antecedent_ras.any(|ra| {
+                ra.visit_subatoms(&mut |ra2| {
+                    if ra == ra2 {
+                        found = true;
+                    }
+                });
+                found
+            })
+        } else {
+            pos_antecedent_ras.any(|ra2| ra == ra2)
+        }
     }
     pub fn split_consequents(&self) -> impl Iterator<Item = Self> + '_ {
         self.consequents.iter().map(|consequent| Self {
