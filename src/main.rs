@@ -24,9 +24,6 @@ fn main() -> Result<(), ()> {
             if config.test("ast1") {
                 println!("ast before preprocessing: {:#?}", parts);
             }
-            if config.test("save") {
-                preprocessing::add_antecedent_variables_as_pos_literals(parts);
-            }
             preprocessing::normalize_domain_id_formatting(parts, config.test("local"));
             let eq_classes = EqClasses::new(parts);
             if config.test("eq") {
@@ -44,6 +41,9 @@ fn main() -> Result<(), ()> {
                 println!("domain equivalence class error: {:?}", e);
             } else {
                 preprocessing::deanonymize_variables(parts);
+                if config.test("save") {
+                    preprocessing::add_antecedent_variables_as_pos_literals(parts);
+                }
                 if config.test("ast2") {
                     println!("ast after preprocessing: {:#?}", parts);
                 }

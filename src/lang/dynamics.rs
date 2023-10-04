@@ -355,8 +355,7 @@ impl Rule {
                     // all checks passed
                     for consequent in self.consequents.iter() {
                         let atom = consequent.concretize(va).expect("should work");
-
-                        if executable_config.infer_sub_consequents {
+                        if executable_config.subconsequence {
                             let mut subatoms = HashSet::<&Atom>::default();
                             atom.collect_subatoms(&mut subatoms);
                             for subatom in subatoms {

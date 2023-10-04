@@ -27,7 +27,7 @@ static FLAG_DESC_SLICE: &[(&str, &str)] = &[
     ("no-deno", "do not print the program denotation, i.e., truths and unknowns"),
     ("source", "print given Seaso source code after preprocessing"),
     ("save", "preprocess rules s.t. they are safe by adding consequent-only variables as positive antecedents"),
-    ("infer-sub-consequents", "rules implicitly infer all consequents' subconsequents, also"),
+    ("subconsequence", "rules implicitly infer all consequents' subconsequents"),
 ];
 impl Default for Config {
     fn default() -> Self {
@@ -64,6 +64,6 @@ impl Default for Config {
 
 impl Config {
     pub fn executable_config(&self) -> ExecutableConfig {
-        ExecutableConfig { infer_sub_consequents: self.test("infer-sub-consequents") }
+        ExecutableConfig { subconsequence: self.test("subconsequence") }
     }
 }

@@ -111,7 +111,7 @@ pub struct EqClasses {
 
 #[derive(Debug)]
 pub struct ExecutableConfig {
-    pub(crate) infer_sub_consequents: bool,
+    pub(crate) subconsequence: bool,
 }
 
 #[derive(Debug)]
