@@ -1,4 +1,7 @@
+use std::collections::HashSet;
+
 use crate::*;
+
 impl ExecutableProgram {
     pub fn ontology_dot(&self) -> String {
         self.ontology_dot_inner().expect("String write cannot fail")
@@ -13,11 +16,13 @@ impl ExecutableProgram {
             write!(&mut s, "  {:?} [color=\"blue\"];\n", did)?;
         }
         for (did, params) in &self.dd {
-            write!(&mut s, "  {:?} [color=\"green\"];\n", did)?;
+            write!(&mut s, "  {:?} [color=\"orange\"];\n", did)?;
             for param in params {
                 write!(s, "    {:?} -> {:?};\n", did, param)?;
             }
         }
+
+        let mut already_output = HashSet::<(_, _, _)>::default();
         for ar in &self.annotated_rules {
             for consequent in &ar.rule.consequents {
                 let did_c = consequent.domain_id(&ar.v2d).expect("whee");
@@ -25,9 +30,11 @@ impl ExecutableProgram {
                     let did_a = antecedent.ra.domain_id(&ar.v2d).expect("whee");
                     let color_str = match antecedent.sign {
                         Sign::Pos => "green",
-                        Sign::Neg => "orange",
+                        Sign::Neg => "red",
                     };
-                    write!(s, "    {:?} -> {:?} [color={:?}];\n", did_c, did_a, color_str)?;
+                    if already_output.insert((did_c, did_a, color_str)) {
+                        write!(s, "    {:?} -> {:?} [color={:?}];\n", did_c, did_a, color_str)?;
+                    }
                 }
             }
         }
