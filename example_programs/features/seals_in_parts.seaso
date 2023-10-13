@@ -1,0 +1,8 @@
+# Seals in a part do not apply inside the part.
+# Effectively, the contents of parts are entirely unordered.
+
+part part1 {
+	defn domain1().
+	seal domain1.
+	rule domain1().
+}

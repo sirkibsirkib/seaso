@@ -18,7 +18,8 @@ fn main() -> Result<(), ()> {
     if config.test("source") {
         println!("source after preprocessing: <<\n{}\n>>", &source);
     }
-    let mut parse_result = nom::combinator::all_consuming(parse::parts_and_statements)(&source);
+    let mut parse_result =
+        nom::combinator::all_consuming(parse::wsr(parse::parts_and_statements))(&source);
     match &mut parse_result {
         Ok((_, parts)) => {
             if config.test("ast1") {

@@ -1,6 +1,6 @@
-# Simple example of modules and how they relate to sealing.
+# Simple example of parts and how they relate to sealing.
 
-# "module x lets y also modify int"
+# "part x lets y also modify int"
 part a: b {
 	# variable 
     seal int.
