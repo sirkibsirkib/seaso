@@ -1,3 +1,5 @@
+# Demonstratin a long, complex chain of negative inference.
+
 defn a(int). b(int). c(int). d(int).
      e(int). f(int). g(int). h(int).
 rule c(I) :- a(I), !b(I).

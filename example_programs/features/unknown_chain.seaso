@@ -1,3 +1,5 @@
+# Demonstrates a complex chain of reasoning that propagates unknownness.
+
 rule
   "   " :- !"   ".
   "N  " :- !"   ".

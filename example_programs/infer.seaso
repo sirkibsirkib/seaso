@@ -1,3 +1,0 @@
-defn x(int).
-rule x(I) :- I.
-     1.

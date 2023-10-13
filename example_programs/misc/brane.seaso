@@ -1,3 +1,5 @@
+# A larger example formalising several concepts.
+
 part main {
 	decl agent. data. task. label.
 	defn own(agent,data). assLabel(data,label). checker(agent).

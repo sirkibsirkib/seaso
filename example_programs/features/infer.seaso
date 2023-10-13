@@ -1,0 +1,5 @@
+# A simple example of an inference rule.
+
+defn x(int).
+rule x(I) :- I.
+rule 1.

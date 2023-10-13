@@ -1,0 +1,3 @@
+# `person` is used but undeclared! Interpreter gives a warning.
+
+defn friend(person,person).

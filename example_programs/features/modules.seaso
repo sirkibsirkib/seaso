@@ -1,3 +1,6 @@
+# A Seaso program _modelling_ Seaso's module system.
+# Note, this program does not _use_ Seaso's module system.
+
 decl module. domain.
 defn with(module,module). seals(module,domain).
      modifies(module,domain). breaks(module,module).

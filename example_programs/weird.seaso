@@ -1,9 +1,0 @@
-# Recursive domain definition is ok (but there are no constructible atoms).
-defn x(x).
-
-# A rule constructing a recursive domain is ok (but will never be instantiated).
-rule x(X) :- X.
-
-seal x.
-# Definition after sealing is ok (but conflicting definitions would be disallowed as usual).
-defn x(x).

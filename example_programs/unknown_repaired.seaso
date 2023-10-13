@@ -1,6 +1,0 @@
-rule 1 :- !2, 3.
-     2 :- !1.
-     3.
-
-# {1,2} are unknown until this fixes it. 2 is true so 1 is false.
-rule 2.

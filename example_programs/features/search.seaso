@@ -1,0 +1,28 @@
+# An example of modelling a search problem in Seaso.
+
+defn agent(str). data(int). data_eq(data,data).
+     assignment(agent,data).
+     assigned(data). unassigned(data).
+     overworked(agent).
+
+# destructuring
+rule S :- agent(S).
+     I :- data(I).
+     A, D :- assignment(A,D).
+     D :- assigned(D).
+     D :- unassigned(D).
+     A :- overworked(A).
+
+# relationships
+rule data_eq(D,D) :- D.
+     overworked(A) :- assignment(A,D1), assignment(A,D2), (!data_eq(D1,D2).
+
+# defining a scenario
+rule agent("Amy"). agent("Bob"). agent("Dan").
+
+# these are undesirable
+emit unassigned. overworked.
+
+# these cannot be changed anymore
+seal assigned. unassigned. overworked. eq.
+

@@ -1,0 +1,23 @@
+# Simple example of modules and how they relate to sealing.
+
+# "module x lets y also modify int"
+part a: b {
+	# variable 
+    seal int.
+}
+
+part b: c {}
+
+part c {
+	# this does NOT break a's seal on int
+	# this DOES     break d's seal on int 
+	rule 1.
+}
+
+part d {
+	# this breaks 
+	seal int.
+}
+
+
+

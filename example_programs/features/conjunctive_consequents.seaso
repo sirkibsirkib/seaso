@@ -1,0 +1,4 @@
+# This simply demonstrates that one rule can have 1+ consequents.
+
+defn pair(int,int).
+rule pair(X,Y), pair(Y,X) :- X, Y.

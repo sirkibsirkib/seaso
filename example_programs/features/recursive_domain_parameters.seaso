@@ -1,0 +1,5 @@
+# Recursive domain definition is ok, but they have no constructible atoms!
+defn x(x).
+
+# A rule constructing a recursive domain is ok (but will never be instantiated).
+rule x(X) :- X.

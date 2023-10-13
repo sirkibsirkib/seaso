@@ -1,2 +1,0 @@
-defn foo(bar,baz).
-rule Bar, Baz :- foo(Bar, Baz).

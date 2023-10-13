@@ -1,3 +1,6 @@
+# Defining integer arithmetic operations and their axioms.
+# N-ary functions are encoded as (N+1)-ary tuples.
+
 defn even(int). pos(int). next(int,int). eq(int,int).
      lt(int,int). neg(int,int). sum(int,int,int).
      sub(int,int,int). mul(int,int,int). div(int,int,int).

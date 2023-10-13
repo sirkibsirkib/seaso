@@ -1,3 +1,10 @@
+# This demonstrates a (cumbersome) encoding of `count`, whose single element
+# is defined as the count of elements in `item`.
+
+# `count` is defined in terms of an order on integers, which Seaso does not
+# provide by default. We let `0` be the initial integer, and let `suc` relate
+# successive elements.
+
 defn next(item,item). items(). notFirst(item). notLast(item). 
      suc(int,int). idx(item,int). count(int). decl item. 
 rule I, J, notLast(I), notFirst(J) :- next(I,J).
@@ -5,5 +12,7 @@ rule I, J, notLast(I), notFirst(J) :- next(I,J).
      idx(J,B)          :- idx(I,A), next(I,J), suc(A,B).
      count(B) :- idx(I,A), !notLast(I), suc(A,B). count(0) :- !items().
 seal items. notFirst. notLast. idx. count. 
+
+# This is an example extension, resulting in `count(2)`
 rule suc(0,1). suc(1,2). suc(2,3). suc(3,4).
 defn item(str). rule next(item("X"),item("Y")).
