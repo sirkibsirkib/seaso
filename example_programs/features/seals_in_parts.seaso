@@ -6,3 +6,6 @@ part part1 {
 	seal domain1.
 	rule domain1().
 }
+
+rule 2.
+seal int.

@@ -97,10 +97,16 @@ pub struct AnnotatedRule {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct PartName(pub String);
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct StatementAt {
+    part_name: PartName,
+    statement_index: usize,
+}
+
 #[derive(Debug, Default)]
 pub struct DomainSealersModifiers {
-    pub sealers: HashSet<PartName>,
-    pub modifiers: HashSet<PartName>,
+    pub sealers: HashSet<StatementAt>,
+    pub modifiers: HashSet<StatementAt>,
 }
 
 #[derive(Debug)]

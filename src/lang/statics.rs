@@ -17,7 +17,7 @@ pub struct Part {
     pub uses: VecSet<PartName>,
     pub statements: VecSet<Statement>,
 }
-pub struct PartPreorder<'a> {
+pub struct PartUsageGraph<'a> {
     edges: HashSet<[&'a PartName; 2]>,
 }
 
@@ -25,8 +25,8 @@ pub struct PartPreorder<'a> {
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct SealBreak<'a> {
     pub did: &'a DomainId,
-    pub modifier: &'a PartName,
-    pub sealer: &'a PartName,
+    pub modifier: &'a StatementAt,
+    pub sealer: &'a StatementAt,
 }
 
 #[derive(Debug)]
@@ -61,7 +61,7 @@ impl<'a> PartMap<'a> {
     }
 }
 
-impl<'a> PartPreorder<'a> {
+impl<'a> PartUsageGraph<'a> {
     pub fn new(part_map: &'a PartMap<'a>) -> Self {
         let mut edges = HashSet::<[&'a PartName; 2]>::default();
         for (&x, part) in &part_map.map {
@@ -90,6 +90,16 @@ impl<'a> PartPreorder<'a> {
         Self { edges }
     }
 
+    fn would_break(&self, sealer: &StatementAt, modifier: &StatementAt) -> bool {
+        if sealer.part_name.0 == "" && modifier.part_name.0 == "" {
+            // special case! statement order matters!
+            return sealer.statement_index < modifier.statement_index;
+        }
+        // normal case. Based part usage graph
+        sealer.part_name != modifier.part_name
+            && !self.edges.contains(&[&sealer.part_name, &modifier.part_name])
+    }
+
     pub fn iter_breaks<'b: 'a>(
         &'a self,
         ep: &'b ExecutableProgram,
@@ -98,9 +108,7 @@ impl<'a> PartPreorder<'a> {
             dsm.sealers.iter().flat_map(move |sealer| {
                 dsm.modifiers
                     .iter()
-                    .filter(move |&modifier| {
-                        sealer != modifier && !self.edges.contains(&[sealer, modifier])
-                    })
+                    .filter(move |&modifier| self.would_break(sealer, modifier))
                     .map(move |modifier| SealBreak { sealer, modifier, did })
             })
         })
@@ -118,13 +126,6 @@ impl ExecutableProgram {
     pub fn get_used_undeclared(&self) -> &HashSet<DomainId> {
         &self.used_undeclared
     }
-    fn part_statements<'a>(
-        part_map: &'a PartMap<'a>,
-    ) -> impl Iterator<Item = (&PartName, &Statement)> {
-        part_map.map.iter().flat_map(move |(&part_name, part)| {
-            part.statements.iter().map(move |statement| (part_name, statement))
-        })
-    }
     pub fn is_sealed(&self, did: &DomainId) -> bool {
         self.sealers_modifiers.get(did).map(|dsm| !dsm.sealers.is_empty()).unwrap_or(false)
     }
@@ -134,28 +135,30 @@ impl ExecutableProgram {
     ) -> Result<Self, ExecutableError<'a>> {
         // pass 1: domain definitions
         let mut dd = DomainDefinitions::default();
-        for (part_name, statement) in Self::part_statements(part_map) {
-            match statement {
-                Statement::Defn { did, params } => {
-                    if did.is_primitive() {
-                        return Err(ExecutableError::DefiningPrimitive {
-                            part_name,
-                            did: did.clone(),
-                            params,
-                        });
-                    }
-                    let prev = dd.insert(did.clone(), params.clone());
-                    if let Some(previous_params) = prev {
-                        if &previous_params != params {
-                            return Err(ExecutableError::ConflictingDefinitions {
+        for (&part_name, part) in part_map.map.iter() {
+            for statement in part.statements.iter() {
+                match statement {
+                    Statement::Defn { did, params } => {
+                        if did.is_primitive() {
+                            return Err(ExecutableError::DefiningPrimitive {
                                 part_name,
                                 did: did.clone(),
-                                params: [previous_params, params.clone()],
+                                params,
                             });
                         }
+                        let prev = dd.insert(did.clone(), params.clone());
+                        if let Some(previous_params) = prev {
+                            if &previous_params != params {
+                                return Err(ExecutableError::ConflictingDefinitions {
+                                    part_name,
+                                    did: did.clone(),
+                                    params: [previous_params, params.clone()],
+                                });
+                            }
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
             }
         }
 
@@ -165,56 +168,56 @@ impl ExecutableProgram {
         let mut emissive = HashSet::<DomainId>::default();
         let mut declared = HashSet::<DomainId>::default();
         let mut used = HashSet::<DomainId>::default();
-        for (part_name, statement) in Self::part_statements(part_map) {
-            match statement {
-                Statement::Rule(rule) => {
-                    rule.occurring_dids(&mut used);
-                    let v2d = rule.rule_type_variables(&dd).map_err(|err| {
-                        ExecutableError::ExecutableRuleError { part_name, rule, err }
-                    })?;
+        for (&part_name, part) in part_map.map.iter() {
+            for (statement_index, statement) in part.statements.iter().enumerate() {
+                match statement {
+                    Statement::Rule(rule) => {
+                        rule.occurring_dids(&mut used);
+                        let v2d = rule.rule_type_variables(&dd).map_err(|err| {
+                            ExecutableError::ExecutableRuleError { part_name, rule, err }
+                        })?;
 
-                    let mut handle_consequent = |ra: &RuleAtom| {
-                        if !rule.contains_pos_antecedent(ra, executable_config.subconsequence) {
-                            let did = ra.domain_id(&v2d).expect("WAH");
-                            sealers_modifiers
-                                .entry(did.clone())
-                                .or_default()
-                                .modifiers
-                                .insert(part_name.clone());
+                        let mut handle_consequent = |ra: &RuleAtom| {
+                            if !rule.contains_pos_antecedent(ra, executable_config.subconsequence) {
+                                let did = ra.domain_id(&v2d).expect("WAH");
+                                sealers_modifiers.entry(did.clone()).or_default().modifiers.insert(
+                                    StatementAt { part_name: part_name.clone(), statement_index },
+                                );
+                            }
+                        };
+                        for consequent in &rule.consequents {
+                            if executable_config.subconsequence {
+                                // sub-conseuquents are treated as consequents
+                                consequent.visit_subatoms(&mut handle_consequent);
+                            } else {
+                                handle_consequent(consequent)
+                            }
                         }
-                    };
-                    for consequent in &rule.consequents {
-                        if executable_config.subconsequence {
-                            // sub-conseuquents are treated as consequents
-                            consequent.visit_subatoms(&mut handle_consequent);
-                        } else {
-                            handle_consequent(consequent)
+                        annotated_rules.push(AnnotatedRule { v2d, rule: rule.clone() })
+                    }
+                    Statement::Emit(did) => {
+                        used.insert(did.clone());
+                        emissive.insert(did.clone());
+                    }
+                    Statement::Seal(did) => {
+                        used.insert(did.clone());
+                        sealers_modifiers
+                            .entry(did.clone())
+                            .or_default()
+                            .sealers
+                            .insert(StatementAt { part_name: part_name.clone(), statement_index });
+                    }
+                    Statement::Decl(vec) => {
+                        for did in vec {
+                            declared.insert(did.clone());
                         }
                     }
-                    annotated_rules.push(AnnotatedRule { v2d, rule: rule.clone() })
-                }
-                Statement::Emit(did) => {
-                    used.insert(did.clone());
-                    emissive.insert(did.clone());
-                }
-                Statement::Seal(did) => {
-                    used.insert(did.clone());
-                    sealers_modifiers
-                        .entry(did.clone())
-                        .or_default()
-                        .sealers
-                        .insert(part_name.clone());
-                }
-                Statement::Decl(vec) => {
-                    for did in vec {
+                    Statement::Defn { params, did } => {
+                        // did a definition pass earlier
                         declared.insert(did.clone());
-                    }
-                }
-                Statement::Defn { params, did } => {
-                    // did a definition pass earlier
-                    declared.insert(did.clone());
-                    for param in params {
-                        used.insert(param.clone());
+                        for param in params {
+                            used.insert(param.clone());
+                        }
                     }
                 }
             }

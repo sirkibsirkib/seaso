@@ -61,8 +61,8 @@ fn main() -> Result<(), ()> {
                         match ep {
                             Ok(ep) => {
                                 println!("used undeclared domains: {:?}", ep.used_undeclared);
-                                let mp = statics::PartPreorder::new(&part_map);
-                                let seal_breaks = mp.iter_breaks(&ep).collect::<HashSet<_>>();
+                                let pug = statics::PartUsageGraph::new(&part_map);
+                                let seal_breaks = pug.iter_breaks(&ep).collect::<HashSet<_>>();
                                 println!("seal breaks: {:#?}", seal_breaks);
                                 if config.test("asp") {
                                     println!("asp print:\n{}", ep.asp_print());
