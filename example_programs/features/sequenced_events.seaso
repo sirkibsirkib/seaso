@@ -1,0 +1,13 @@
+# formalise "no food should be eaten twice"
+defn food(str). 
+
+# method 1: eat at times, and order times
+defn time(int). before(time,time). eaten(time,food).
+     eaten_twice1(food,time,time). emit eaten_twice1.
+rule eaten_twice1(F,T1,T2) :- eaten(T1,F), eaten(T2,F), before(T1,T2).
+
+# method 2: distinctly identify eat-events
+defn eat(int). eat_food(eat,food). eat_id(eat,eat).
+     eaten_twice2(food,eat,eat). emit eaten_twice2.
+rule eat_id(E,E) :- E.
+rule eaten_twice2(F,E1,E2) :- eat_food(E1,F), eat_food(E2,F), !eat_id(E1,E2).

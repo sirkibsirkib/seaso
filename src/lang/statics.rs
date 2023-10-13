@@ -15,7 +15,7 @@ pub struct PartMap<'a> {
 pub struct Part {
     pub name: PartName,
     pub uses: VecSet<PartName>,
-    pub statements: VecSet<Statement>,
+    pub statements: Vec<Statement>,
 }
 pub struct PartUsageGraph<'a> {
     edges: HashSet<[&'a PartName; 2]>,

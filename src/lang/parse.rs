@@ -60,12 +60,12 @@ where
 ////////////////////////////
 
 pub fn parts_and_statements(mut i: &str) -> IResult<&str, Vec<Part>> {
-    let mut anon_mod_statements = VecSet::<Statement>::default();
+    let mut anon_mod_statements = Vec::<Statement>::default();
     let mut parts = vec![];
     loop {
         if let Ok((i2, ss)) = statements1(i) {
             for s in ss {
-                anon_mod_statements.insert(s);
+                anon_mod_statements.push(s);
             }
             i = i2;
         } else if let Ok((i2, m)) = part(i) {
@@ -107,10 +107,10 @@ pub fn like_statements(i: &str) -> IResult<&str, Vec<Statement>> {
         stmts1("rule", rule),
     ))(i)
 }
-pub fn statements0(i: &str) -> IResult<&str, VecSet<Statement>> {
+pub fn statements0(i: &str) -> IResult<&str, Vec<Statement>> {
     nommap(many0(like_statements), |x| x.into_iter().flatten().collect())(i)
 }
-pub fn statements1(i: &str) -> IResult<&str, VecSet<Statement>> {
+pub fn statements1(i: &str) -> IResult<&str, Vec<Statement>> {
     nommap(many1(like_statements), |x| x.into_iter().flatten().collect())(i)
 }
 
