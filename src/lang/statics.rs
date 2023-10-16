@@ -93,7 +93,6 @@ impl<'a> PartUsageGraph<'a> {
     fn would_break(&self, sealer: &StatementAt, modifier: &StatementAt) -> bool {
         if sealer.part_name.0 == "" && modifier.part_name.0 == "" {
             // special case! statement order matters!
-            println!("WAH WAH");
             return sealer.statement_index < modifier.statement_index;
         }
         // normal case. Based part usage graph

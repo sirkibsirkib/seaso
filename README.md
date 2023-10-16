@@ -21,7 +21,7 @@ The compiled binary ('the Seaso executor') will be found at `./target/release/se
 ### Usage
 Run the Seaso executor, feeding in your source code as standard input. For example, run the following:
 ```
-./target/release/seaso.exe < ./program_examples/trust.seaso`
+.\target\release\seaso.exe < .\example_programs\misc\trust.seaso`
 ```
 
 ### Output
@@ -38,9 +38,9 @@ seal breaks: {}
 denotation: Denotation {
     truths: {
         eq: [
-            eq(party("Amy"), party("Amy")),
-            eq(party("Bob"), party("Bob")),
-            eq(party("Dan"), party("Dan")),
+            eq(party("Amy"),party("Amy")),
+            eq(party("Bob"),party("Bob")),
+            eq(party("Dan"),party("Dan")),
         ],
         party: [
             party("Amy"),
@@ -48,9 +48,9 @@ denotation: Denotation {
             party("Dan"),
         ],
         trust: [
-            trust(party("Amy"), party("Bob")),
-            trust(party("Amy"), party("Dan")),
-            trust(party("Dan"), party("Bob")),
+            trust(party("Amy"),party("Bob")),
+            trust(party("Amy"),party("Dan")),
+            trust(party("Dan"),party("Bob")),
         ],
         trusted: [
             trusted(party("Bob")),
@@ -75,9 +75,9 @@ denotation: Denotation {
 ### CLI options
 Run the tool with flag `--help` to see the optional arguments, used to customize the output.
 
-Some of the arguments change the preprocessor. For example, only with `--local` is program `part x { decl a  . }` preprocessed to `part x { decl a@x. }`.
+Some of the arguments change the preprocessor. For example, only with `--local` is program `part x { decl a. }` preprocessed to `part x { decl a@x. }`.
 
-Most of the arguments change which metadata is printed. For exampe, _with_ `--ast1` and `--ast2`, the abstract syntax tree is printed before and after preprocessing, respectively.  
+Most of the arguments change which metadata is printed. For example, _with_ `--ast1` and `--ast2`, the abstract syntax tree is printed before and after preprocessing, respectively.  
 
 ## Source and library
 

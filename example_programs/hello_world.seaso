@@ -1,0 +1,7 @@
+# This is a simple program that illustrates each
+# kind of Seaso statement: seal, emit and so on.
+
+defn hello(str).
+rule "Hello, world!".
+rule hello(S) :- S.
+emit hello. seal hello.
