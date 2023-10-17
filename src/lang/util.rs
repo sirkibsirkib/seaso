@@ -5,8 +5,10 @@ use core::{
 };
 use std::collections::{HashMap, HashSet};
 
-pub struct Digraph<T> {
-    pub edges: HashSet<[T; 2]>,
+#[derive(Debug)]
+pub struct Digraph<V: Ord> {
+    verts: VecSet<V>,
+    edges: HashSet<[V; 2]>,
 }
 
 /// Structure used in debug printing. Prints elements separated by commas.
@@ -27,27 +29,59 @@ pub struct VecSetMutGuard<'a, T: Ord> {
 
 /////////////////////////
 
-impl<T> Digraph<T> {
-    pub fn transitively_close(&mut self, universe: impl Iterator<Item = T> + Clone)
+impl<T: Ord> Default for Digraph<T> {
+    fn default() -> Self {
+        Digraph { edges: Default::default(), verts: Default::default() }
+    }
+}
+
+impl<T: Ord> Digraph<T> {
+    pub fn insert_edge(&mut self, edge: [T; 2])
     where
-        T: Eq + Hash + Copy,
+        T: Clone + Hash + Eq,
     {
-        for x in universe.clone() {
-            for y in universe.clone() {
-                if x != y {
-                    for z in universe.clone() {
-                        if x != z
-                            && y != z
-                            && self.edges.contains(&[x, y])
-                            && self.edges.contains(&[y, z])
-                            && !self.edges.contains(&[x, z])
+        for vert in edge.iter() {
+            self.verts.insert(vert.clone());
+        }
+        self.edges.insert(edge);
+    }
+
+    pub fn contains_edge(&self, edge: &[T; 2]) -> bool
+    where
+        T: Hash + Eq,
+    {
+        self.edges.contains(edge)
+    }
+    pub fn transitively_close(&mut self)
+    where
+        T: Eq + Hash + Clone,
+    {
+        'rep: loop {
+            for x in self.verts.iter() {
+                for y in self.verts.iter() {
+                    // if x == y {
+                    //     continue;
+                    // }
+                    for z in self.verts.iter() {
+                        // if x == z || y == z {
+                        //     continue;
+                        // }
+                        if self.edges.contains(&[x.clone(), y.clone()])
+                            && self.edges.contains(&[y.clone(), z.clone()])
+                            && !self.edges.contains(&[x.clone(), z.clone()])
                         {
-                            self.edges.insert([x, z]);
+                            if self.edges.insert([x.clone(), z.clone()]) {
+                                // continue 'rep;
+                            }
                         }
                     }
                 }
             }
+            break 'rep;
         }
+    }
+    pub fn verts(&self) -> &VecSet<T> {
+        &self.verts
     }
 }
 

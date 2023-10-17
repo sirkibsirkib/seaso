@@ -1,0 +1,3 @@
+decl a. b. c.
+rule a(b(c(1))).
+rule c(a(b(1))).

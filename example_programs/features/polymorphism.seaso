@@ -1,0 +1,15 @@
+decl event. agent. computation. data. bad. allowed.
+defn compute(agent,computation). transfer(agent,data,agent).
+
+rule event(C:computation).
+rule event(T:transfer).
+
+rule transfer(A,data(2),A).
+rule agent("bob").
+
+rule bad(E) :- E:event, !allowed(E).
+
+rule allowed(E:event) :- bad(E).
+
+rule allowed(E:event).
+

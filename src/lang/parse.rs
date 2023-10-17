@@ -21,6 +21,13 @@ where
     preceded(multispace0, inner)
 }
 
+pub fn wstag<'a, E>(inner: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, E>
+where
+    E: ParseError<&'a str> + 'a,
+{
+    wsl(tag(inner))
+}
+
 pub fn wsr<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
     E: ParseError<&'a str>,
@@ -29,22 +36,13 @@ where
     terminated(inner, multispace0)
 }
 
-pub fn ws<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
-where
-    E: ParseError<&'a str> + 'a,
-    F: FnMut(&'a str) -> IResult<&'a str, O, E> + 'a,
-    O: 'a,
-{
-    wsl(wsr(inner))
-}
-
 pub fn commasep<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<O>, E>
 where
     E: ParseError<&'a str> + 'a,
     F: FnMut(&'a str) -> IResult<&'a str, O, E> + 'a,
     O: 'a,
 {
-    separated_list0(ws(tag(",")), inner)
+    separated_list0(wstag(","), inner)
 }
 
 pub fn list<'a, F: 'a, O: 'a, E: ParseError<&'a str> + 'a>(
@@ -54,7 +52,7 @@ where
     E: ParseError<&'a str>,
     F: FnMut(&'a str) -> IResult<&'a str, O, E> + 'a,
 {
-    delimited(ws(tag("(")), commasep(inner), ws(tag(")")))
+    delimited(wstag("("), commasep(inner), wstag(")"))
 }
 
 ////////////////////////////
@@ -84,19 +82,22 @@ pub fn parts_and_statements(mut i: &str) -> IResult<&str, Vec<Part>> {
 }
 
 pub fn part(i: &str) -> IResult<&str, Part> {
-    let (i, (name, maybe_uses, statements)) = tuple((
-        preceded(ws(tag("part")), part_name),
-        opt(preceded(ws(tag(":")), commasep(part_name))),
-        terminated(preceded(ws(tag("{")), statements0), ws(tag("}"))),
-    ))(i)?;
-    Ok((i, Part { name, uses: VecSet::from_vec(maybe_uses.unwrap_or_default()), statements }))
+    let name = preceded(wstag("part"), part_name);
+    let uses = preceded(wstag(":"), commasep(part_name));
+    let body = delimited(wstag("{"), statements0, wstag("}"));
+    let p = tuple((name, opt(uses), body));
+    nommap(p, |(name, maybe_uses, statements)| Part {
+        name,
+        uses: VecSet::from_vec(maybe_uses.unwrap_or_default()),
+        statements,
+    })(i)
 }
 pub fn like_statements(i: &str) -> IResult<&str, Vec<Statement>> {
     pub fn stmts1<'a, F: FnMut(&'a str) -> IResult<&'a str, Statement> + 'a>(
         string: &'a str,
         inner: F,
     ) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<Statement>> + 'a {
-        preceded(ws(tag(string)), many0(terminated(inner, ws(tag(".")))))
+        preceded(wstag(string), many0(terminated(inner, wstag("."))))
     }
     alt((
         stmts1("decl", decl),
@@ -114,7 +115,7 @@ pub fn statements1(i: &str) -> IResult<&str, Vec<Statement>> {
 }
 
 pub fn decl(i: &str) -> IResult<&str, Statement> {
-    let p = separated_list0(ws(tag("=")), domain_id);
+    let p = separated_list0(wstag("="), domain_id);
     nommap(p, Statement::Decl)(i)
 }
 pub fn emit(i: &str) -> IResult<&str, Statement> {
@@ -134,7 +135,7 @@ pub fn defn(i: &str) -> IResult<&str, Statement> {
 pub fn rule(i: &str) -> IResult<&str, Statement> {
     let c = commasep(rule_atom);
     let a = alt((
-        preceded(ws(tag(":-")), commasep(rule_literal)),
+        preceded(wstag(":-"), commasep(rule_literal)),
         nommap(multispace0, |_| Vec::default()),
     ));
     let (i, (consequents, antecedents)) = pair(c, a)(i)?;
@@ -148,20 +149,22 @@ pub fn id_suffix(i: &str) -> IResult<&str, &str> {
 }
 
 pub fn domain_id(i: &str) -> IResult<&str, DomainId> {
+    let pre = many0_count(tag("_"));
     let fst = pair(satisfy(|c| c.is_ascii_lowercase()), id_suffix);
-    let snd = pair(ws(tag("@")), part_name);
-    let did = recognize(pair(fst, opt(snd)));
-    nommap(ws(did), |ident| DomainId(ident.to_owned()))(i)
+    let snd = pair(wsl(tag("@")), part_name);
+    let did = recognize(tuple((pre, fst, opt(snd))));
+    nommap(wsl(did), |ident| DomainId(ident.to_owned()))(i)
 }
 
 pub fn ascription(i: &str) -> IResult<&str, DomainId> {
-    preceded(wsl(tag(":")), domain_id)(i)
+    preceded(wstag(":"), domain_id)(i)
 }
 
 pub fn variable(i: &str) -> IResult<&str, RuleAtom> {
-    let some_vid = recognize(pair(satisfy(|c| c.is_ascii_uppercase()), id_suffix));
-    let vid = alt((some_vid, tag("_")));
-    let variable_id = nommap(ws(vid), |ident| VariableId(ident.to_owned()));
+    let some_vid =
+        recognize(tuple((many0_count(tag("_")), satisfy(|c| c.is_ascii_uppercase()), id_suffix)));
+    let vid = wsl(alt((some_vid, tag("_"))));
+    let variable_id = nommap(vid, |ident| VariableId(ident.to_owned()));
     nommap(pair(variable_id, opt(ascription)), |(vid, ascription)| RuleAtom::Variable {
         vid,
         ascription,
@@ -169,18 +172,20 @@ pub fn variable(i: &str) -> IResult<&str, RuleAtom> {
 }
 
 pub fn string(i: &str) -> IResult<&str, String> {
-    nommap(delimited(tag("\""), recognize(many0_count(none_of("\""))), tag("\"")), str::to_owned)(i)
+    nommap(delimited(wstag("\""), recognize(many0_count(none_of("\""))), tag("\"")), str::to_owned)(
+        i,
+    )
 }
 
 pub fn part_name(i: &str) -> IResult<&str, PartName> {
-    let some_mid = recognize(pair(satisfy(|c| c.is_ascii_lowercase()), id_suffix));
+    let some_mid = wsl(recognize(pair(satisfy(|c| c.is_ascii_lowercase()), id_suffix)));
     nommap(nommap(some_mid, str::to_owned), PartName)(i)
 }
 
 pub fn constant(i: &str) -> IResult<&str, RuleAtom> {
     let int_constant = nommap(nomi64, Constant::Int);
     let str_constant = nommap(string, Constant::Str);
-    nommap(ws(alt((int_constant, str_constant))), RuleAtom::Constant)(i)
+    nommap(wsl(alt((int_constant, str_constant))), RuleAtom::Constant)(i)
 }
 
 pub fn construct(i: &str) -> IResult<&str, RuleAtom> {
@@ -189,11 +194,11 @@ pub fn construct(i: &str) -> IResult<&str, RuleAtom> {
 }
 
 pub fn rule_atom(i: &str) -> IResult<&str, RuleAtom> {
-    alt((variable, constant, construct))(i)
+    alt((construct, variable, constant))(i)
 }
 
 pub fn rule_literal(i: &str) -> IResult<&str, RuleLiteral> {
-    let (i, (excl, ra)) = pair(opt(ws(tag("!"))), rule_atom)(i)?;
+    let (i, (excl, ra)) = pair(opt(wstag("!")), rule_atom)(i)?;
     let sign = if excl.is_some() { Sign::Neg } else { Sign::Pos };
     Ok((i, RuleLiteral { sign, ra }))
 }

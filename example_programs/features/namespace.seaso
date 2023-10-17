@@ -2,14 +2,14 @@
 # In this example, no seals are broken.
 
 part one {
-	defn a@one(int).
-	seal a@two.
+	#defn a@one(int).
+	#seal a@two.
 
 	# this is redundant IFF Seaso is run with `local` flag.
-	decl a = a@one.
+	#decl a = a@one.
 
 }
 part two {
-	defn a@two(int).
-	rule a@one(1).
+	#defn a@two(int).
+	#rule a@one(1).
 }

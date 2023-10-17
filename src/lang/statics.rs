@@ -19,6 +19,7 @@ pub struct Part {
 }
 
 pub type PartUsageGraph<'a> = crate::util::Digraph<&'a PartName>;
+pub type ArgumentGraph<'a> = crate::util::Digraph<DomainId>;
 
 /// Identifies which statements first seal and then modify which domain.
 #[derive(Debug, Eq, Hash, PartialEq)]
@@ -32,7 +33,7 @@ pub struct SealBreak<'a> {
 pub enum ExecutableRuleError {
     OneVariableTwoTypes { vid: VariableId, domains: [DomainId; 2] },
     MistypedArgument { constructor: DomainId, expected: DomainId, got: DomainId },
-    UndefinedConstructor(DomainId),
+    // UndefinedConstructor(DomainId),
     VariableNotEnumerable(VariableId),
     WrongArity { did: DomainId, param_count: usize, arg_count: usize },
     NoTypes(VariableId),
@@ -43,6 +44,7 @@ pub enum ExecutableError<'a> {
     ConflictingDefinitions { part_name: &'a PartName, did: DomainId, params: [Vec<DomainId>; 2] },
     DefiningPrimitive { part_name: &'a PartName, did: DomainId, params: &'a [DomainId] },
     ExecutableRuleError { part_name: &'a PartName, rule: &'a Rule, err: ExecutableRuleError },
+    CyclicConstruction { did: DomainId },
 }
 
 //////////////////
@@ -61,8 +63,8 @@ impl<'a> PartMap<'a> {
                 }
             }
         }
-        let mut digraph = PartUsageGraph { edges };
-        digraph.transitively_close(self.map.keys().copied());
+        let mut digraph = PartUsageGraph::default();
+        digraph.transitively_close();
         digraph
     }
     pub fn depended_undefined_names(&self) -> impl Iterator<Item = &PartName> {
@@ -81,7 +83,7 @@ impl<'a> PartUsageGraph<'a> {
         }
         // normal case. Based part usage graph
         sealer.part_name != modifier.part_name
-            && !self.edges.contains(&[&sealer.part_name, &modifier.part_name])
+            && !self.contains_edge(&[&sealer.part_name, &modifier.part_name])
     }
 
     pub fn iter_breaks<'b: 'a>(
@@ -117,12 +119,12 @@ impl ExecutableProgram {
         part_map: &'a PartMap<'a>,
         executable_config: ExecutableConfig,
     ) -> Result<Self, ExecutableError<'a>> {
-        // pass 1: domain definitions
-        let mut dd = DomainDefinitions::default();
-        for (&part_name, part) in part_map.map.iter() {
-            for statement in part.statements.iter() {
-                match statement {
-                    Statement::Defn { did, params } => {
+        // pass 1: collect domain definitions
+        let dd = {
+            let mut dd = DomainDefinitions::default();
+            for (&part_name, part) in part_map.map.iter() {
+                for statement in part.statements.iter() {
+                    if let Statement::Defn { did, params } = statement {
                         if did.is_primitive() {
                             return Err(ExecutableError::DefiningPrimitive {
                                 part_name,
@@ -141,15 +143,16 @@ impl ExecutableProgram {
                             }
                         }
                     }
-                    _ => {}
                 }
             }
-        }
+            dd
+        };
 
         // pass 2: everything else
         let mut annotated_rules = vec![];
         let mut sealers_modifiers = HashMap::<DomainId, DomainSealersModifiers>::default();
         let mut emissive = HashSet::<DomainId>::default();
+        let mut ag = ArgumentGraph::default();
         let mut declared = HashSet::<DomainId>::default();
         let mut used = HashSet::<DomainId>::default();
         for (&part_name, part) in part_map.map.iter() {
@@ -160,6 +163,18 @@ impl ExecutableProgram {
                         let v2d = rule.rule_type_variables(&dd).map_err(|err| {
                             ExecutableError::ExecutableRuleError { part_name, rule, err }
                         })?;
+
+                        let visitor = &mut |ra: &RuleAtom| {
+                            if let RuleAtom::Construct { did, args } = ra {
+                                for arg in args {
+                                    let arg_did = arg.domain_id(&v2d).expect("MUST");
+                                    ag.insert_edge([did.clone(), arg_did.clone()]);
+                                }
+                            }
+                        };
+                        for consequent in rule.consequents.iter() {
+                            consequent.visit_subatoms(visitor);
+                        }
 
                         let mut rule = rule.clone();
                         rule.clear_variable_ascriptions();
@@ -210,8 +225,16 @@ impl ExecutableProgram {
                 }
             }
         }
-        let used_undeclared =
+        let used_undeclared: HashSet<_> =
             used.into_iter().filter(|did| !declared.contains(did) && !did.is_primitive()).collect();
+
+        ag.transitively_close();
+        for did in ag.verts().iter() {
+            if ag.contains_edge(&[did.clone(), did.clone()]) {
+                return Err(ExecutableError::CyclicConstruction { did: did.clone() });
+            }
+        }
+
         let declared_undefined = declared.into_iter().filter(|did| !dd.contains_key(did)).collect();
         Ok(ExecutableProgram {
             dd,
@@ -408,36 +431,39 @@ impl RuleAtom {
                 }
             }
             Self::Construct { did, args } => {
-                let param_dids =
-                    dd.get(did).ok_or(ExecutableRuleError::UndefinedConstructor(did.clone()))?;
-                if param_dids.len() != args.len() {
-                    return Err(ExecutableRuleError::WrongArity {
-                        did: did.clone(),
-                        param_count: param_dids.len(),
-                        arg_count: args.len(),
-                    });
-                }
-                for (arg, param_did) in args.iter().zip(param_dids.iter()) {
-                    if let Self::Variable { vid, .. } = arg {
-                        match vt.insert(vid.clone(), param_did.clone()) {
-                            Some(param_did2) if param_did != &param_did2 => {
-                                return Err(ExecutableRuleError::OneVariableTwoTypes {
-                                    vid: vid.clone(),
-                                    domains: [param_did.clone(), param_did2.clone()],
+                if let Some(param_dids) = dd.get(did) {
+                    if param_dids.len() != args.len() {
+                        return Err(ExecutableRuleError::WrongArity {
+                            did: did.clone(),
+                            param_count: param_dids.len(),
+                            arg_count: args.len(),
+                        });
+                    }
+                    for (arg, param_did) in args.iter().zip(param_dids.iter()) {
+                        if let Self::Variable { vid, .. } = arg {
+                            match vt.insert(vid.clone(), param_did.clone()) {
+                                Some(param_did2) if param_did != &param_did2 => {
+                                    return Err(ExecutableRuleError::OneVariableTwoTypes {
+                                        vid: vid.clone(),
+                                        domains: [param_did.clone(), param_did2.clone()],
+                                    });
+                                }
+                                _ => {}
+                            }
+                        } else if let Some(arg_did) = arg.apparent_did() {
+                            if arg_did != param_did {
+                                return Err(ExecutableRuleError::MistypedArgument {
+                                    constructor: did.clone(),
+                                    expected: param_did.clone(),
+                                    got: arg_did.clone(),
                                 });
                             }
-                            _ => {}
-                        }
-                    } else if let Some(arg_did) = arg.apparent_did() {
-                        if arg_did != param_did {
-                            return Err(ExecutableRuleError::MistypedArgument {
-                                constructor: did.clone(),
-                                expected: param_did.clone(),
-                                got: arg_did.clone(),
-                            });
                         }
                     }
                 }
+                // let param_dids =
+                //     dd.get(did).ok_or(ExecutableRuleError::UndefinedConstructor(did.clone()))?;
+
                 for arg in args {
                     arg.type_variables(dd, vt)?
                 }
