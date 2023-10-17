@@ -161,6 +161,9 @@ impl ExecutableProgram {
                             ExecutableError::ExecutableRuleError { part_name, rule, err }
                         })?;
 
+                        let mut rule = rule.clone();
+                        rule.clear_variable_ascriptions();
+
                         let mut handle_consequent = |ra: &RuleAtom| {
                             if !rule.contains_pos_antecedent(ra, executable_config.subconsequence) {
                                 let did = ra.domain_id(&v2d).expect("WAH");
@@ -177,7 +180,8 @@ impl ExecutableProgram {
                                 handle_consequent(consequent)
                             }
                         }
-                        annotated_rules.push(AnnotatedRule { v2d, rule: rule.clone() })
+
+                        annotated_rules.push(AnnotatedRule { v2d, rule })
                     }
                     Statement::Emit(did) => {
                         used.insert(did.clone());
@@ -320,6 +324,16 @@ impl Rule {
             }
         }
     }
+    fn clear_variable_ascriptions(&mut self) {
+        let func = &mut |ra: &mut RuleAtom| {
+            if let RuleAtom::Variable { ascription, .. } = ra {
+                *ascription = None
+            }
+        };
+        for ra in self.root_atoms_mut() {
+            ra.visit_subatoms_mut(func)
+        }
+    }
 }
 
 impl DomainId {
@@ -342,11 +356,19 @@ impl Constant {
 }
 
 impl RuleAtom {
-    fn visit_subatoms<'a, 'b>(&'a self, visitor: &'b mut impl FnMut(&'a Self)) {
+    fn visit_subatoms(&self, visitor: &mut impl FnMut(&Self)) {
         visitor(self);
         if let Self::Construct { args, .. } = self {
             for arg in args {
                 arg.visit_subatoms(visitor)
+            }
+        }
+    }
+    fn visit_subatoms_mut(&mut self, visitor: &mut impl FnMut(&mut Self)) {
+        visitor(self);
+        if let Self::Construct { args, .. } = self {
+            for arg in args {
+                arg.visit_subatoms_mut(visitor)
             }
         }
     }
