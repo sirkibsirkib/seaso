@@ -48,7 +48,7 @@ pub enum Constant {
 /// See `Atom` (defined in `dynamics.rs`) for the concretized version.
 #[derive(Clone, PartialEq, Hash, Eq, Ord, PartialOrd)]
 pub enum RuleAtom {
-    Variable(VariableId),
+    Variable { vid: VariableId, ascription: Option<DomainId> },
     Constant(Constant),
     Construct { did: DomainId, args: Vec<RuleAtom> },
 }

@@ -258,7 +258,7 @@ impl Atom {
         va: &mut VariableAssignments,
     ) -> Result<(), ()> {
         match (self, ra) {
-            (atom1, RuleAtom::Variable(vid)) => va.insert(vid, atom1.clone()),
+            (atom1, RuleAtom::Variable { vid, .. }) => va.insert(vid, atom1.clone()),
             (Atom::Construct { args: atoms, .. }, RuleAtom::Construct { args: rule_atoms, .. }) => {
                 if atoms.len() == rule_atoms.len() {
                     for (atom, rule_atom) in atoms.iter().zip(rule_atoms) {
@@ -294,7 +294,7 @@ impl Atom {
 impl RuleAtom {
     fn concretize(&self, va: &VariableAssignments) -> Result<Atom, ()> {
         match self {
-            RuleAtom::Variable(vid) => va.get(vid).ok_or(()).cloned(),
+            RuleAtom::Variable { vid, .. } => va.get(vid).ok_or(()).cloned(),
             RuleAtom::Constant(c) => Ok(Atom::Constant { c: c.clone() }),
             RuleAtom::Construct { args, did } => Ok(Atom::Construct {
                 args: args.iter().map(|ra| ra.concretize(va)).collect::<Result<Vec<_>, _>>()?,

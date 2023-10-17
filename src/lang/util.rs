@@ -155,7 +155,7 @@ impl<'a, T: Debug + 'a, I: IntoIterator<Item = &'a T> + Clone> Debug for CommaSe
 impl Debug for RuleAtom {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            Self::Variable(vid) => vid.fmt(f),
+            Self::Variable { vid, .. } => vid.fmt(f),
             Self::Constant(c) => c.fmt(f),
             Self::Construct { did, args } => {
                 write!(f, "{:?}({:?})", did, CommaSep { iter: args, spaced: false })

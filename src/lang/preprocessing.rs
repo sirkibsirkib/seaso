@@ -25,8 +25,10 @@ pub fn add_antecedent_variables_as_pos_literals(parts: &mut [Part]) {
                 let consequent_vids = rule.consequent_variables();
                 for vid in consequent_vids {
                     if !rule.is_enumerable_variable(&vid) {
-                        rule.antecedents
-                            .push(RuleLiteral { ra: RuleAtom::Variable(vid), sign: Sign::Pos });
+                        rule.antecedents.push(RuleLiteral {
+                            ra: RuleAtom::Variable { vid, ascription: None },
+                            sign: Sign::Pos,
+                        });
                     }
                 }
             }
@@ -134,7 +136,7 @@ pub fn deanonymize_variables(parts: &mut [Part]) {
 impl VisitMut<DomainId> for RuleAtom {
     fn visit_mut<F: FnMut(&mut DomainId)>(&mut self, f: &mut F) {
         match self {
-            Self::Variable(..) | Self::Constant(..) => {}
+            Self::Variable { .. } | Self::Constant(..) => {}
             Self::Construct { did, args } => {
                 f(did);
                 for arg in args {
@@ -187,7 +189,7 @@ impl VisitMut<VariableId> for RuleAtom {
                     arg.visit_mut(f)
                 }
             }
-            Self::Variable(vid) => f(vid),
+            Self::Variable { vid, .. } => f(vid),
             Self::Constant(..) => {}
         }
     }

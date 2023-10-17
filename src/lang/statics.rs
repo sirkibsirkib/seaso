@@ -225,7 +225,7 @@ impl Rule {
     pub fn consequent_variables(&self) -> HashSet<VariableId> {
         let mut set = HashSet::<VariableId>::default();
         let visitor = &mut |ra: &RuleAtom| {
-            if let RuleAtom::Variable(vid) = ra {
+            if let RuleAtom::Variable { vid, .. } = ra {
                 set.insert(vid.clone());
             }
         };
@@ -237,7 +237,7 @@ impl Rule {
     pub fn is_enumerable_variable(&self, vid: &VariableId) -> bool {
         let mut found = false;
         let visitor = &mut |ra: &RuleAtom| {
-            if let RuleAtom::Variable(vid2) = ra {
+            if let RuleAtom::Variable { vid: vid2, .. } = ra {
                 if vid == vid2 {
                     found = true;
                 }
@@ -276,7 +276,7 @@ impl Rule {
     }
     pub fn root_vars(&self) -> impl Iterator<Item = &VariableId> {
         self.root_atoms().filter_map(|ra| match ra {
-            RuleAtom::Variable(vid) => Some(vid),
+            RuleAtom::Variable { vid, .. } => Some(vid),
             _ => None,
         })
     }
@@ -370,39 +370,55 @@ impl RuleAtom {
         dd: &DomainDefinitions,
         vt: &mut VariableTypes,
     ) -> Result<(), ExecutableRuleError> {
-        if let RuleAtom::Construct { did, args } = self {
-            let param_dids =
-                dd.get(did).ok_or(ExecutableRuleError::UndefinedConstructor(did.clone()))?;
-            if param_dids.len() != args.len() {
-                return Err(ExecutableRuleError::WrongArity {
-                    did: did.clone(),
-                    param_count: param_dids.len(),
-                    arg_count: args.len(),
-                });
-            }
-            for (arg, param_did) in args.iter().zip(param_dids.iter()) {
-                if let RuleAtom::Variable(vid) = arg {
-                    match vt.insert(vid.clone(), param_did.clone()) {
-                        Some(param_did2) if param_did != &param_did2 => {
+        match self {
+            Self::Constant(..) => {}
+            Self::Variable { vid, ascription } => {
+                if let Some(did) = ascription {
+                    match vt.insert(vid.clone(), did.clone()) {
+                        Some(did2) if did != &did2 => {
                             return Err(ExecutableRuleError::OneVariableTwoTypes {
                                 vid: vid.clone(),
-                                domains: [param_did.clone(), param_did2.clone()],
+                                domains: [did.clone(), did2.clone()],
                             });
                         }
                         _ => {}
                     }
-                } else if let Some(arg_did) = arg.apparent_did() {
-                    if arg_did != param_did {
-                        return Err(ExecutableRuleError::MistypedArgument {
-                            constructor: did.clone(),
-                            expected: param_did.clone(),
-                            got: arg_did.clone(),
-                        });
-                    }
                 }
             }
-            for arg in args {
-                arg.type_variables(dd, vt)?
+            Self::Construct { did, args } => {
+                let param_dids =
+                    dd.get(did).ok_or(ExecutableRuleError::UndefinedConstructor(did.clone()))?;
+                if param_dids.len() != args.len() {
+                    return Err(ExecutableRuleError::WrongArity {
+                        did: did.clone(),
+                        param_count: param_dids.len(),
+                        arg_count: args.len(),
+                    });
+                }
+                for (arg, param_did) in args.iter().zip(param_dids.iter()) {
+                    if let Self::Variable { vid, .. } = arg {
+                        match vt.insert(vid.clone(), param_did.clone()) {
+                            Some(param_did2) if param_did != &param_did2 => {
+                                return Err(ExecutableRuleError::OneVariableTwoTypes {
+                                    vid: vid.clone(),
+                                    domains: [param_did.clone(), param_did2.clone()],
+                                });
+                            }
+                            _ => {}
+                        }
+                    } else if let Some(arg_did) = arg.apparent_did() {
+                        if arg_did != param_did {
+                            return Err(ExecutableRuleError::MistypedArgument {
+                                constructor: did.clone(),
+                                expected: param_did.clone(),
+                                got: arg_did.clone(),
+                            });
+                        }
+                    }
+                }
+                for arg in args {
+                    arg.type_variables(dd, vt)?
+                }
             }
         }
         Ok(())
@@ -410,7 +426,7 @@ impl RuleAtom {
     fn variables(&self, vids: &mut HashSet<VariableId>) {
         match self {
             RuleAtom::Constant { .. } => {}
-            RuleAtom::Variable(vid) => drop(vids.insert(vid.clone())),
+            RuleAtom::Variable { vid, .. } => drop(vids.insert(vid.clone())),
             RuleAtom::Construct { args, .. } => {
                 for arg in args {
                     arg.variables(vids)
@@ -421,7 +437,9 @@ impl RuleAtom {
     pub fn domain_id<'a>(&'a self, vt: &'a VariableTypes) -> Result<&'a DomainId, ()> {
         match self {
             RuleAtom::Construct { did, .. } => Ok(did),
-            RuleAtom::Variable(vid) => vt.get(vid).ok_or(()),
+            RuleAtom::Variable { vid, ascription } => {
+                ascription.as_ref().or_else(|| vt.get(vid)).ok_or(())
+            }
             RuleAtom::Constant(c) => Ok(c.domain_id()),
         }
     }

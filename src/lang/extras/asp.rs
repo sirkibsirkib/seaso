@@ -6,7 +6,7 @@ type VarRewrites<'a> = HashMap<&'a VariableId, RuleAtom>;
 impl RuleAtom {
     fn asp_rewrite(&self, var_rewrites: &VarRewrites) -> Self {
         match self {
-            Self::Variable(vid) => {
+            Self::Variable { vid, .. } => {
                 if let Some(ra) = var_rewrites.get(vid) {
                     return ra.clone();
                 }
@@ -51,7 +51,10 @@ impl AnnotatedRule {
                     return None;
                 };
                 let args = (0..num_params)
-                    .map(|i| RuleAtom::Variable(VariableId(format!("{:?}{}", vid, i))))
+                    .map(|i| RuleAtom::Variable {
+                        vid: VariableId(format!("{:?}{}", vid, i)),
+                        ascription: None,
+                    })
                     .collect();
                 let ra = RuleAtom::Construct { did: did.clone(), args };
                 Some((vid, ra))
@@ -106,7 +109,10 @@ impl ExecutableProgram {
                 let v2d: VariableTypes = Some((vid.clone(), did.clone())).into_iter().collect();
                 let rule = Rule {
                     consequents: vec![],
-                    antecedents: vec![RuleLiteral { sign: Sign::Pos, ra: RuleAtom::Variable(vid) }],
+                    antecedents: vec![RuleLiteral {
+                        sign: Sign::Pos,
+                        ra: RuleAtom::Variable { vid, ascription: None },
+                    }],
                 };
                 if let Some(ar) = (AnnotatedRule { v2d, rule }).asp_rewrite(&self.dd) {
                     write!(&mut s, "{:?}\n", ar.rule)?;
@@ -123,7 +129,7 @@ impl ExecutableProgram {
                 let mut antecedents = vec![];
                 for (i, param) in params.iter().enumerate() {
                     let vid = VariableId(format!("V{}", i));
-                    let ra = RuleAtom::Variable(vid.clone());
+                    let ra = RuleAtom::Variable { vid: vid.clone(), ascription: None };
                     let rl = RuleLiteral { sign: Sign::Pos, ra: ra.clone() };
                     v2d.insert(vid, param.clone());
                     args.push(ra);

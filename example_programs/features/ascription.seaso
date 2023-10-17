@@ -1,0 +1,8 @@
+defn guy(str). some().
+
+# typing `G` using ascription.
+rule some() :- G:guy.
+
+# typing `G` using a dummy domain.
+defn dummy(guy).
+rule some(), dummy(G) :- G.
