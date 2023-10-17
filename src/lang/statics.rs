@@ -17,9 +17,8 @@ pub struct Part {
     pub uses: VecSet<PartName>,
     pub statements: Vec<Statement>,
 }
-pub struct PartUsageGraph<'a> {
-    edges: HashSet<[&'a PartName; 2]>,
-}
+
+pub type PartUsageGraph<'a> = crate::util::Digraph<&'a PartName>;
 
 /// Identifies which statements first seal and then modify which domain.
 #[derive(Debug, Eq, Hash, PartialEq)]
@@ -53,6 +52,19 @@ impl<'a> PartMap<'a> {
         let map = util::collect_map_lossless(parts.into_iter().map(|part| (&part.name, part)));
         map.map(|map| Self { map })
     }
+    pub fn part_usage_graph(&self) -> PartUsageGraph {
+        let mut edges = HashSet::<[&'a PartName; 2]>::default();
+        for (&x, part) in &self.map {
+            for y in part.uses.iter() {
+                if x != y {
+                    edges.insert([x, y]);
+                }
+            }
+        }
+        let mut digraph = PartUsageGraph { edges };
+        digraph.transitively_close(self.map.keys().copied());
+        digraph
+    }
     pub fn depended_undefined_names(&self) -> impl Iterator<Item = &PartName> {
         self.depended_parts().filter(|name| !self.map.contains_key(name))
     }
@@ -62,34 +74,6 @@ impl<'a> PartMap<'a> {
 }
 
 impl<'a> PartUsageGraph<'a> {
-    pub fn new(part_map: &'a PartMap<'a>) -> Self {
-        let mut edges = HashSet::<[&'a PartName; 2]>::default();
-        for (&x, part) in &part_map.map {
-            for y in part.uses.iter() {
-                if x != y {
-                    edges.insert([x, y]);
-                }
-            }
-        }
-        for &x in part_map.map.keys() {
-            for &y in part_map.map.keys() {
-                if x != y {
-                    for &z in part_map.map.keys() {
-                        if x != z
-                            && y != z
-                            && edges.contains(&[x, y])
-                            && edges.contains(&[y, z])
-                            && !edges.contains(&[x, z])
-                        {
-                            edges.insert([&x, &z]);
-                        }
-                    }
-                }
-            }
-        }
-        Self { edges }
-    }
-
     fn would_break(&self, sealer: &StatementAt, modifier: &StatementAt) -> bool {
         if sealer.part_name.0 == "" && modifier.part_name.0 == "" {
             // special case! statement order matters!

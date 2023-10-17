@@ -3,7 +3,11 @@ use core::{
     fmt::{Debug, Formatter, Result as FmtResult},
     hash::Hash,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+pub struct Digraph<T> {
+    pub edges: HashSet<[T; 2]>,
+}
 
 /// Structure used in debug printing. Prints elements separated by commas.
 pub(crate) struct CommaSep<'a, T: Debug + 'a, I: IntoIterator<Item = &'a T> + Clone> {
@@ -22,6 +26,30 @@ pub struct VecSetMutGuard<'a, T: Ord> {
 }
 
 /////////////////////////
+
+impl<T> Digraph<T> {
+    pub fn transitively_close(&mut self, universe: impl Iterator<Item = T> + Clone)
+    where
+        T: Eq + Hash + Copy,
+    {
+        for x in universe.clone() {
+            for y in universe.clone() {
+                if x != y {
+                    for z in universe.clone() {
+                        if x != z
+                            && y != z
+                            && self.edges.contains(&[x, y])
+                            && self.edges.contains(&[y, z])
+                            && !self.edges.contains(&[x, z])
+                        {
+                            self.edges.insert([x, z]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 pub fn map_snd<A, B, C>(
     iter: impl IntoIterator<Item = (A, B)>,

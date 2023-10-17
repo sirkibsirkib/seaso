@@ -84,7 +84,6 @@ pub fn parts_and_statements(mut i: &str) -> IResult<&str, Vec<Part>> {
 }
 
 pub fn part(i: &str) -> IResult<&str, Part> {
-    // let uses =
     let (i, (name, maybe_uses, statements)) = tuple((
         preceded(ws(tag("part")), part_name),
         opt(preceded(ws(tag(":")), commasep(part_name))),
