@@ -19,7 +19,7 @@ pub struct Part {
 }
 
 pub type PartUsageGraph<'a> = crate::util::Digraph<&'a PartName>;
-pub type ArgumentGraph<'a> = crate::util::Digraph<DomainId>;
+pub type ArgumentGraph<'a> = crate::util::Digraph<&'a DomainId>;
 
 /// Identifies which statements first seal and then modify which domain.
 #[derive(Debug, Eq, Hash, PartialEq)]
@@ -33,7 +33,6 @@ pub struct SealBreak<'a> {
 pub enum ExecutableRuleError {
     OneVariableTwoTypes { vid: VariableId, domains: [DomainId; 2] },
     MistypedArgument { constructor: DomainId, expected: DomainId, got: DomainId },
-    // UndefinedConstructor(DomainId),
     VariableNotEnumerable(VariableId),
     WrongArity { did: DomainId, param_count: usize, arg_count: usize },
     NoTypes(VariableId),
@@ -109,19 +108,23 @@ impl DomainId {
 }
 
 // adds [X,Y] to argument graph for each X-type construct containing Y-type variable.
-fn populate_argument_graph(ag: &mut ArgumentGraph, rule: &Rule, v2d: &VariableTypes) {
-    fn walk<'a, 'b, 'c, 'd>(
+fn populate_argument_graph<'a, 'b>(
+    ag: &'a mut ArgumentGraph<'b>,
+    rule: &'b Rule,
+    v2d: &'b VariableTypes,
+) {
+    fn walk<'a, 'b, 'c>(
         ra: &'a RuleAtom,
-        ag: &'b mut ArgumentGraph,
-        v2d: &'c VariableTypes,
-        outer_dids: &'d mut Vec<&'a DomainId>,
+        ag: &'b mut ArgumentGraph<'a>,
+        v2d: &'a VariableTypes,
+        outer_dids: &'c mut Vec<&'a DomainId>,
     ) {
         match ra {
             RuleAtom::Constant(_) => {}
             RuleAtom::Variable { vid, .. } => {
                 let inner_did = v2d.get(vid).expect("WAH");
                 for &outer_did in outer_dids.iter() {
-                    ag.insert_edge([outer_did.clone(), inner_did.clone()]);
+                    ag.insert_edge([outer_did, inner_did]);
                 }
             }
             RuleAtom::Construct { did, args } => {
@@ -194,10 +197,6 @@ impl ExecutableProgram {
                         let v2d = rule.rule_type_variables(&dd).map_err(|err| {
                             ExecutableError::ExecutableRuleError { part_name, rule, err }
                         })?;
-                        populate_argument_graph(&mut ag, rule, &v2d);
-
-                        let mut rule = rule.clone();
-                        rule.clear_variable_ascriptions();
 
                         let mut handle_consequent = |ra: &RuleAtom| {
                             if !rule.contains_pos_antecedent(ra, executable_config.subconsequence) {
@@ -216,7 +215,7 @@ impl ExecutableProgram {
                             }
                         }
 
-                        annotated_rules.push(AnnotatedRule { v2d, rule })
+                        annotated_rules.push(AnnotatedRule { v2d, rule: rule.clone() })
                     }
                     Statement::Emit(did) => {
                         used.insert(did.clone());
@@ -245,12 +244,20 @@ impl ExecutableProgram {
                 }
             }
         }
+
+        for AnnotatedRule { rule, v2d } in annotated_rules.iter_mut() {
+            populate_argument_graph(&mut ag, rule, v2d);
+
+            let mut rule = rule.clone();
+            rule.clear_variable_ascriptions();
+        }
+
         let used_undeclared: HashSet<_> =
             used.into_iter().filter(|did| !declared.contains(did) && !did.is_primitive()).collect();
 
         ag.transitively_close();
-        for did in ag.verts().iter() {
-            if ag.contains_edge(&[did.clone(), did.clone()]) {
+        for &did in ag.verts().iter() {
+            if ag.contains_edge(&[did, did]) {
                 return Err(ExecutableError::CyclicConstruction { did: did.clone() });
             }
         }
