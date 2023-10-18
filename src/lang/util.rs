@@ -3,12 +3,12 @@ use core::{
     fmt::{Debug, Formatter, Result as FmtResult},
     hash::Hash,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct Digraph<V: Ord> {
     verts: VecSet<V>,
-    edges: HashSet<[V; 2]>,
+    edges: VecSet<[V; 2]>,
 }
 
 /// Structure used in debug printing. Prints elements separated by commas.
@@ -137,6 +137,9 @@ impl<T: Ord> VecSet<T> {
                 None
             }
         }
+    }
+    pub fn contains(&self, t: &T) -> bool {
+        self.elements.binary_search(&t).is_ok()
     }
     pub fn as_vec_mut(&mut self) -> VecSetMutGuard<T> {
         VecSetMutGuard { set: self }
