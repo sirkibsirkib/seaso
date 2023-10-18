@@ -190,7 +190,7 @@ impl ExecutableProgram {
             for (statement_index, statement) in part.statements.iter().enumerate() {
                 match statement {
                     Statement::Rule(rule) => {
-                        rule.occurring_dids(&mut used);
+                        rule.used_dids(&mut used);
                         let v2d = rule.rule_type_variables(&dd).map_err(|err| {
                             ExecutableError::ExecutableRuleError { part_name, rule, err }
                         })?;
@@ -327,9 +327,9 @@ impl Rule {
             _ => None,
         })
     }
-    fn occurring_dids(&self, dids: &mut HashSet<DomainId>) {
+    fn used_dids(&self, dids: &mut HashSet<DomainId>) {
         for ra in self.root_atoms() {
-            ra.occurring_dids(dids)
+            ra.used_dids(dids)
         }
     }
     pub fn root_atoms(&self) -> impl Iterator<Item = &RuleAtom> {
@@ -415,11 +415,21 @@ impl RuleAtom {
             }
         }
     }
-    fn occurring_dids(&self, dids: &mut HashSet<DomainId>) {
-        if let RuleAtom::Construct { did, args } = self {
-            dids.insert(did.clone());
-            for arg in args {
-                arg.occurring_dids(dids)
+    fn used_dids(&self, dids: &mut HashSet<DomainId>) {
+        match self {
+            RuleAtom::Constant(_) => {}
+            RuleAtom::Variable { ascription, .. } => {
+                if let Some(did) = ascription {
+                    dids.insert(did.clone());
+                }
+            }
+            RuleAtom::Construct { did, args } => {
+                if !args.is_empty() {
+                    dids.insert(did.clone());
+                    for arg in args {
+                        arg.used_dids(dids)
+                    }
+                }
             }
         }
     }

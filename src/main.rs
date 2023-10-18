@@ -53,17 +53,26 @@ fn main() -> Result<(), ()> {
                     Err(clashing_name) => println!("clashing part name: {:?}", clashing_name),
                     Ok(part_map) => {
                         let dumn = part_map.depended_undefined_names().collect::<HashSet<_>>();
-                        println!("dependend undefined parts: {:?}", dumn);
+                        if !dumn.is_empty() {
+                            println!("~ ~ WARNING: dependend undefined parts: {:?} ~ ~", dumn);
+                        }
                         let ep = ExecutableProgram::new(&part_map, config.executable_config());
                         if config.test("ir") {
                             println!("internal representation: {:#?}", ep);
                         }
                         match ep {
                             Ok(ep) => {
-                                println!("used undeclared domains: {:?}", ep.used_undeclared);
+                                if !ep.used_undeclared.is_empty() {
+                                    println!(
+                                        "~ ~ WARNING: used undeclared domains: {:?} ~ ~",
+                                        ep.used_undeclared
+                                    );
+                                }
                                 let pug = part_map.part_usage_graph();
                                 let seal_breaks = pug.iter_breaks(&ep).collect::<HashSet<_>>();
-                                println!("seal breaks: {:#?}", seal_breaks);
+                                if !seal_breaks.is_empty() {
+                                    println!("~ ~ WARNING: seal breaks: {:#?} ~ ~", seal_breaks);
+                                }
                                 if config.test("asp") {
                                     println!("asp print:\n{}", ep.asp_print());
                                 }

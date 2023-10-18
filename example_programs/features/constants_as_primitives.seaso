@@ -1,4 +1,5 @@
-defn amy. decl person.
-
-rule person(amy).
+decl person. defn friend(person,person).
+rule person(amy). person(bob).
+     friend(X,Z) :- friend(X,Y), friend(Y,Z).
+     friend(P,P) :- P.
 
