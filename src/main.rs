@@ -64,7 +64,7 @@ fn main() -> Result<(), ()> {
                             Ok(ep) => {
                                 if !ep.used_undeclared.is_empty() {
                                     println!(
-                                        "~ ~ WARNING: used undeclared domains: {:?} ~ ~",
+                                        "~ ~ WARNING: domains undeclared but are variables or have arguements: {:?} ~ ~",
                                         ep.used_undeclared
                                     );
                                 }
