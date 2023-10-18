@@ -2,3 +2,5 @@ decl person. defn friend(person,person).
 rule person(amy). person(bob).
      friend(X,Z) :- friend(X,Y), friend(Y,Z).
      friend(P,P) :- P.
+
+rule a(A) :- A:a.

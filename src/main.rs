@@ -11,7 +11,7 @@ fn stdin_to_string() -> Result<String, std::io::Error> {
     Ok(buffer)
 }
 
-fn main() -> Result<(), ()> {
+fn main() {
     let config = config::Config::default();
     let source = stdin_to_string().expect("bad stdin");
     let source = preprocessing::comments_removed(source);
@@ -21,6 +21,7 @@ fn main() -> Result<(), ()> {
     let mut parse_result =
         nom::combinator::all_consuming(parse::wsr(parse::parts_and_statements))(&source);
     match &mut parse_result {
+        Err(e) => println!("parse error: {:#?}", e),
         Ok((_, parts)) => {
             if config.test("ast1") {
                 println!("ast before preprocessing: {:#?}", parts);
@@ -61,7 +62,13 @@ fn main() -> Result<(), ()> {
                             println!("internal representation: {:#?}", ep);
                         }
                         match ep {
+                            Err(e) => {
+                                println!("~ ~ ERROR: error constructing executable: {:#?}", e)
+                            }
                             Ok(ep) => {
+                                if let Some(cycle) = ep.unbounded_domain_cycle() {
+                                    return println!("~ ~ ERROR: termination uncertain due to unbounded domain cycle: {:?} ~ ~", cycle);
+                                }
                                 if !ep.used_undeclared.is_empty() {
                                     println!(
                                         "~ ~ WARNING: domains undeclared but are variables or have arguements: {:?} ~ ~",
@@ -94,13 +101,10 @@ fn main() -> Result<(), ()> {
                                     }
                                 }
                             }
-                            Err(e) => println!("executable error: {:#?}", e),
                         }
                     }
                 }
             }
         }
-        Err(e) => println!("parse error: {:#?}", e),
     }
-    Ok(())
 }

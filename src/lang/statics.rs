@@ -43,7 +43,6 @@ pub enum ExecutableError<'a> {
     ConflictingDefinitions { part_name: &'a PartName, did: DomainId, params: [Vec<DomainId>; 2] },
     DefiningPrimitive { part_name: &'a PartName, did: DomainId, params: &'a [DomainId] },
     ExecutableRuleError { part_name: &'a PartName, rule: &'a Rule, err: ExecutableRuleError },
-    CyclicConstruction { did: DomainId },
 }
 
 //////////////////
@@ -149,6 +148,20 @@ impl ExecutableProgram {
     pub fn is_sealed(&self, did: &DomainId) -> bool {
         self.sealers_modifiers.get(did).map(|dsm| !dsm.sealers.is_empty()).unwrap_or(false)
     }
+    pub fn unbounded_domain_cycle(&self) -> Option<DomainId> {
+        // pass 3: (termination detection) build argument graph, throw error on cycle
+        let mut ag = ArgumentGraph::default();
+        for AnnotatedRule { rule, v2d } in self.annotated_rules.iter() {
+            populate_argument_graph(&mut ag, rule, v2d);
+        }
+        ag.transitively_close();
+        for &did in ag.verts().iter() {
+            if ag.contains_edge(&[did, did]) {
+                return Some(did.clone());
+            }
+        }
+        None
+    }
     pub fn new<'a>(
         part_map: &'a PartMap<'a>,
         executable_config: ExecutableConfig,
@@ -244,18 +257,6 @@ impl ExecutableProgram {
                         }
                     }
                 }
-            }
-        }
-
-        // pass 3: (termination detection) build argument graph, throw error on cycle
-        let mut ag = ArgumentGraph::default();
-        for AnnotatedRule { rule, v2d } in annotated_rules.iter() {
-            populate_argument_graph(&mut ag, rule, v2d);
-        }
-        ag.transitively_close();
-        for &did in ag.verts().iter() {
-            if ag.contains_edge(&[did, did]) {
-                return Err(ExecutableError::CyclicConstruction { did: did.clone() });
             }
         }
 
