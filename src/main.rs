@@ -75,13 +75,13 @@ fn main() -> Result<(), ()> {
                                     println!("how: {:#?}", ep.how(&denotation_res));
                                 }
                                 if !config.test("no-deno") {
-                                    if config.test("bare") {
+                                    if config.test("cluster") {
+                                        println!("denotation: {:#?}", denotation_res.denotation)
+                                    } else {
                                         println!(
                                             "denotation: {:#?}",
                                             denotation_res.denotation.bare()
-                                        );
-                                    } else {
-                                        println!("denotation: {:#?}", denotation_res.denotation);
+                                        )
                                     }
                                 }
                             }

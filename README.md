@@ -37,37 +37,23 @@ used undeclared domains: {}
 seal breaks: {}
 denotation: Denotation {
     truths: {
-        eq: [
-            eq(party("Amy"),party("Amy")),
-            eq(party("Bob"),party("Bob")),
-            eq(party("Dan"),party("Dan")),
-        ],
-        party: [
-            party("Amy"),
-            party("Bob"),
-            party("Dan"),
-        ],
-        trust: [
-            trust(party("Amy"),party("Bob")),
-            trust(party("Amy"),party("Dan")),
-            trust(party("Dan"),party("Bob")),
-        ],
-        trusted: [
-            trusted(party("Bob")),
-            trusted(party("Dan")),
-        ],
-        untrusted: [
-            untrusted(party("Amy")),
-        ],
-        very_trusted: [
-            very_trusted(party("Bob")),
-        ],
+        eq(party("Amy"),party("Amy")),
+        eq(party("Bob"),party("Bob")),
+        eq(party("Dan"),party("Dan")),
+        party("Amy"),
+        party("Bob"),
+        party("Dan"),
+        trust(party("Amy"),party("Bob")),
+        trust(party("Amy"),party("Dan")),
+        trust(party("Dan"),party("Bob")),
+        trusted(party("Bob")),
+        trusted(party("Dan")),
+        untrusted(party("Amy")),
+        very_trusted(party("Bob")),
     },
     unknowns: {},
     emissions: {
-        untrusted: [
-            untrusted(party("Amy")),
-        ],
+        untrusted(party("Amy")),
     },
 }
 ```

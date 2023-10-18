@@ -127,9 +127,11 @@ pub fn seal(i: &str) -> IResult<&str, Statement> {
 }
 
 pub fn defn(i: &str) -> IResult<&str, Statement> {
-    let (i, did) = domain_id(i)?;
-    let (i, params) = list(domain_id)(i)?;
-    Ok((i, Statement::Defn { did, params }))
+    let p = pair(domain_id, opt(list(domain_id)));
+    nommap(p, |(did, maybe_params)| Statement::Defn {
+        did,
+        params: maybe_params.unwrap_or_default(),
+    })(i)
 }
 
 pub fn rule(i: &str) -> IResult<&str, Statement> {
@@ -138,8 +140,9 @@ pub fn rule(i: &str) -> IResult<&str, Statement> {
         preceded(wstag(":-"), commasep(rule_literal)),
         nommap(multispace0, |_| Vec::default()),
     ));
-    let (i, (consequents, antecedents)) = pair(c, a)(i)?;
-    Ok((i, Statement::Rule(Rule { consequents, antecedents })))
+    nommap(pair(c, a), |(consequents, antecedents)| {
+        Statement::Rule(Rule { consequents, antecedents })
+    })(i)
 }
 
 ////////// (SUB)EXPRESSION-LEVEL PARSERS //////////
@@ -189,8 +192,11 @@ pub fn constant(i: &str) -> IResult<&str, RuleAtom> {
 }
 
 pub fn construct(i: &str) -> IResult<&str, RuleAtom> {
-    let pair = pair(domain_id, list(rule_atom));
-    nommap(pair, |(did, args)| RuleAtom::Construct { did, args })(i)
+    let pair = pair(domain_id, opt(list(rule_atom)));
+    nommap(pair, |(did, maybe_args)| RuleAtom::Construct {
+        did,
+        args: maybe_args.unwrap_or_default(),
+    })(i)
 }
 
 pub fn rule_atom(i: &str) -> IResult<&str, RuleAtom> {

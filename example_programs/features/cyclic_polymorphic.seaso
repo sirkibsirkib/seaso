@@ -1,3 +1,3 @@
-decl a. b. c.
-rule a(b(c(1))).
-rule c(a(b(1))).
+decl a. b.
+rule a(B) :- B:b.
+rule b(A) :- A:a.

@@ -420,7 +420,11 @@ impl std::fmt::Debug for Atom {
                 Constant::Str(c) => c.fmt(f),
             },
             Self::Construct { did, args } => {
-                write!(f, "{:?}({:?})", did, crate::util::CommaSep { iter: args, spaced: false })
+                did.fmt(f)?;
+                if !args.is_empty() {
+                    write!(f, "({:?})", crate::util::CommaSep { iter: args, spaced: false })?;
+                }
+                Ok(())
             }
         }
     }

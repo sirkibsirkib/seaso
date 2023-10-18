@@ -108,6 +108,37 @@ impl DomainId {
     }
 }
 
+// adds [X,Y] to argument graph for each X-type construct containing Y-type variable.
+fn populate_argument_graph(ag: &mut ArgumentGraph, rule: &Rule, v2d: &VariableTypes) {
+    fn walk<'a, 'b, 'c, 'd>(
+        ra: &'a RuleAtom,
+        ag: &'b mut ArgumentGraph,
+        v2d: &'c VariableTypes,
+        outer_dids: &'d mut Vec<&'a DomainId>,
+    ) {
+        match ra {
+            RuleAtom::Constant(_) => {}
+            RuleAtom::Variable { vid, .. } => {
+                let inner_did = v2d.get(vid).expect("WAH");
+                for &outer_did in outer_dids.iter() {
+                    ag.insert_edge([outer_did.clone(), inner_did.clone()]);
+                }
+            }
+            RuleAtom::Construct { did, args } => {
+                outer_dids.push(did);
+                for arg in args {
+                    walk(arg, ag, v2d, outer_dids);
+                }
+                outer_dids.pop().unwrap();
+            }
+        }
+    }
+    let mut outer_dids = vec![];
+    for consequent in rule.consequents.iter() {
+        walk(consequent, ag, v2d, &mut outer_dids)
+    }
+}
+
 impl ExecutableProgram {
     pub fn get_used_undeclared(&self) -> &HashSet<DomainId> {
         &self.used_undeclared
@@ -163,18 +194,7 @@ impl ExecutableProgram {
                         let v2d = rule.rule_type_variables(&dd).map_err(|err| {
                             ExecutableError::ExecutableRuleError { part_name, rule, err }
                         })?;
-
-                        let visitor = &mut |ra: &RuleAtom| {
-                            if let RuleAtom::Construct { did, args } = ra {
-                                for arg in args {
-                                    let arg_did = arg.domain_id(&v2d).expect("MUST");
-                                    ag.insert_edge([did.clone(), arg_did.clone()]);
-                                }
-                            }
-                        };
-                        for consequent in rule.consequents.iter() {
-                            consequent.visit_subatoms(visitor);
-                        }
+                        populate_argument_graph(&mut ag, rule, &v2d);
 
                         let mut rule = rule.clone();
                         rule.clear_variable_ascriptions();

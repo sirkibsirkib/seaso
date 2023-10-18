@@ -1,0 +1,4 @@
+defn amy. decl person.
+
+rule person(amy).
+

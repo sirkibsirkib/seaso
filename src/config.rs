@@ -18,7 +18,7 @@ static FLAG_DESC_SLICE: &[(&str, &str)] = &[
     ("asp", "print Clingo-style answer set program solving for facts removing emissions"),
     ("ast1", "print abstract syntax tree before preprocessing"),
     ("ast2", "print abstract syntax tree after preprocessing"),
-    ("bare", "denotation atoms are not clustered by domain"),
+    ("cluster", "denotation atoms are shown clustered by domain"),
     ("dot", "print GraphViz (.dot) graph ontology of defined domains"),
     ("eq", "print domain equivalence classes and their representative members"),
     ("how", "print the concrete rule antecedents of each truth"),
@@ -49,11 +49,11 @@ impl Default for Config {
                 } else if s.starts_with("--") {
                     s.replace_range(0.."--".len(), "");
                     if !defined_flag_name_to_description.contains_key(s.as_str()) {
-                        println!("Warning: unrecognized flag  `{}`", s);
+                        println!("~ ~ WARNING: unrecognized flag  `{}` ~ ~", s);
                     }
                     Some(s)
                 } else {
-                    println!("Warning: unrecognized input `{}`", s);
+                    println!("~ ~ WARNING: unrecognized input `{}` ~ ~", s);
                     None
                 }
             })

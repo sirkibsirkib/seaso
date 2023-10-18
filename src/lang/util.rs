@@ -56,28 +56,17 @@ impl<T: Ord> Digraph<T> {
     where
         T: Eq + Hash + Clone,
     {
-        'rep: loop {
-            for x in self.verts.iter() {
-                for y in self.verts.iter() {
-                    // if x == y {
-                    //     continue;
-                    // }
-                    for z in self.verts.iter() {
-                        // if x == z || y == z {
-                        //     continue;
-                        // }
-                        if self.edges.contains(&[x.clone(), y.clone()])
-                            && self.edges.contains(&[y.clone(), z.clone()])
-                            && !self.edges.contains(&[x.clone(), z.clone()])
-                        {
-                            if self.edges.insert([x.clone(), z.clone()]) {
-                                // continue 'rep;
-                            }
-                        }
+        for x in self.verts.iter() {
+            for y in self.verts.iter() {
+                for z in self.verts.iter() {
+                    if self.edges.contains(&[x.clone(), y.clone()])
+                        && self.edges.contains(&[y.clone(), z.clone()])
+                        && !self.edges.contains(&[x.clone(), z.clone()])
+                    {
+                        self.edges.insert([x.clone(), z.clone()]);
                     }
                 }
             }
-            break 'rep;
         }
     }
     pub fn verts(&self) -> &VecSet<T> {
@@ -180,7 +169,7 @@ impl<'a, T: Debug + 'a, I: IntoIterator<Item = &'a T> + Clone> Debug for CommaSe
             if i > 0 {
                 write!(f, "{}", if self.spaced { ", " } else { "," })?;
             }
-            write!(f, "{:?}", x)?;
+            x.fmt(f)?;
         }
         Ok(())
     }
@@ -192,7 +181,11 @@ impl Debug for RuleAtom {
             Self::Variable { vid, .. } => vid.fmt(f),
             Self::Constant(c) => c.fmt(f),
             Self::Construct { did, args } => {
-                write!(f, "{:?}({:?})", did, CommaSep { iter: args, spaced: false })
+                did.fmt(f)?;
+                if !args.is_empty() {
+                    CommaSep { iter: args, spaced: false }.fmt(f)?;
+                }
+                Ok(())
             }
         }
     }
@@ -215,7 +208,7 @@ impl Debug for Statement {
                     if i > 0 {
                         write!(f, "=")?;
                     }
-                    write!(f, "{:?}", did)?
+                    did.fmt(f)?;
                 }
                 Ok(())
             }
@@ -237,7 +230,12 @@ impl Debug for Statement {
 }
 impl Debug for DomainId {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}", &self.0)
+        write!(f, "{}", self.0)
+    }
+}
+impl Debug for VariableId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -247,10 +245,5 @@ impl Debug for Constant {
             Self::Int(c) => c.fmt(f),
             Self::Str(c) => c.fmt(f),
         }
-    }
-}
-impl Debug for VariableId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}", &self.0)
     }
 }
