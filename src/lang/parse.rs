@@ -4,7 +4,7 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{alphanumeric1, i64 as nomi64, multispace0, none_of, satisfy},
-    combinator::{map as nommap, opt, recognize},
+    combinator::{map as nommap, opt, recognize, verify},
     error::ParseError,
     multi::{many0, many0_count, many1, separated_list0},
     sequence::{delimited, pair, preceded, terminated, tuple},
@@ -192,7 +192,8 @@ pub fn constant(i: &str) -> IResult<&str, RuleAtom> {
 }
 
 pub fn construct(i: &str) -> IResult<&str, RuleAtom> {
-    let pair = pair(domain_id, opt(list(rule_atom)));
+    let f = |did: &DomainId| did.0 != "str" && did.0 != "int";
+    let pair = pair(verify(domain_id, f), opt(list(rule_atom)));
     nommap(pair, |(did, maybe_args)| RuleAtom::Construct {
         did,
         args: maybe_args.unwrap_or_default(),
