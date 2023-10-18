@@ -182,11 +182,10 @@ impl ExecutableProgram {
             dd
         };
 
-        // pass 2: everything else
+        // pass 2: extract annotated rules from statements. collect usages, sealers, modifiers, ...
         let mut annotated_rules = vec![];
         let mut sealers_modifiers = HashMap::<DomainId, DomainSealersModifiers>::default();
         let mut emissive = HashSet::<DomainId>::default();
-        let mut ag = ArgumentGraph::default();
         let mut declared = HashSet::<DomainId>::default();
         let mut used = HashSet::<DomainId>::default();
         for (&part_name, part) in part_map.map.iter() {
@@ -215,7 +214,10 @@ impl ExecutableProgram {
                             }
                         }
 
-                        annotated_rules.push(AnnotatedRule { v2d, rule: rule.clone() })
+                        annotated_rules.push(AnnotatedRule {
+                            v2d,
+                            rule: rule.clone().variable_ascriptions_cleared(),
+                        })
                     }
                     Statement::Emit(did) => {
                         used.insert(did.clone());
@@ -245,16 +247,11 @@ impl ExecutableProgram {
             }
         }
 
-        for AnnotatedRule { rule, v2d } in annotated_rules.iter_mut() {
+        // pass 3: (termination detection) build argument graph, throw error on cycle
+        let mut ag = ArgumentGraph::default();
+        for AnnotatedRule { rule, v2d } in annotated_rules.iter() {
             populate_argument_graph(&mut ag, rule, v2d);
-
-            let mut rule = rule.clone();
-            rule.clear_variable_ascriptions();
         }
-
-        let used_undeclared: HashSet<_> =
-            used.into_iter().filter(|did| !declared.contains(did) && !did.is_primitive()).collect();
-
         ag.transitively_close();
         for &did in ag.verts().iter() {
             if ag.contains_edge(&[did, did]) {
@@ -262,6 +259,8 @@ impl ExecutableProgram {
             }
         }
 
+        let used_undeclared: HashSet<_> =
+            used.into_iter().filter(|did| !declared.contains(did) && !did.is_primitive()).collect();
         let declared_undefined = declared.into_iter().filter(|did| !dd.contains_key(did)).collect();
         Ok(ExecutableProgram {
             dd,
@@ -373,6 +372,10 @@ impl Rule {
                 Ok(vt)
             }
         }
+    }
+    fn variable_ascriptions_cleared(mut self) -> Self {
+        self.clear_variable_ascriptions();
+        self
     }
     fn clear_variable_ascriptions(&mut self) {
         let func = &mut |ra: &mut RuleAtom| {
