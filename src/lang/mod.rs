@@ -21,13 +21,13 @@ use std::collections::{HashMap, HashSet};
 
 /////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Program {
     pub anon_mod_statements: Vec<Statement>,
     pub parts: VecSet<Part>,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Part {
     pub name: PartName,
     pub uses: VecSet<PartName>,

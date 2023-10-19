@@ -46,7 +46,7 @@ impl Program {
         self.parts.extend(other.parts.into_iter());
         self
     }
-    fn statements_and_at(&self) -> impl Iterator<Item = (&Statement, StatementAt)> {
+    pub fn statements_and_at(&self) -> impl Iterator<Item = (&Statement, StatementAt)> {
         let part_statements = self.parts.iter().flat_map(|part| {
             part.statements
                 .iter()
@@ -204,32 +204,6 @@ impl Program {
     }
 }
 
-// impl<'a> PartMap<'a> {
-//     pub fn new(parts: impl IntoIterator<Item = &'a Part>) -> Result<Self, &'a PartName> {
-//         let map = util::collect_map_lossless(parts.into_iter().map(|part| (&part.name, part)));
-//         map.map(|map| Self { map })
-//     }
-//     pub fn part_usage_graph(&self) -> PartUsageGraph {
-//         let mut edges = HashSet::<[&'a PartName; 2]>::default();
-//         for (&x, part) in &self.map {
-//             for y in part.uses.iter() {
-//                 if x != y {
-//                     edges.insert([x, y]);
-//                 }
-//             }
-//         }
-//         let mut digraph = PartUsageGraph::default();
-//         digraph.transitively_close();
-//         digraph
-//     }
-//     pub fn depended_undefined_names(&self) -> impl Iterator<Item = &PartName> {
-//         self.depended_parts().filter(|name| !self.map.contains_key(name))
-//     }
-//     pub fn depended_parts(&self) -> impl Iterator<Item = &PartName> {
-//         self.map.values().flat_map(|part| part.uses.iter())
-//     }
-// }
-
 impl<'a> PartUsageGraph<'a> {
     fn would_break(&self, sealer: &StatementAt, modifier: &StatementAt) -> bool {
         use StatementAt::{AnonPart, InPart};
@@ -240,13 +214,6 @@ impl<'a> PartUsageGraph<'a> {
             [AnonPart { statement_index: a }, AnonPart { statement_index: b }] => a < b,
             _ => true,
         }
-        // if sealer.part_name.0 == "" && modifier.part_name.0 == "" {
-        //     // special case! statement order matters!
-        //     return sealer.statement_index < modifier.statement_index;
-        // }
-        // // normal case. Based part usage graph
-        // sealer.part_name != modifier.part_name
-        //     && !self.contains_edge(&[&sealer.part_name, &modifier.part_name])
     }
 
     pub fn iter_breaks<'b: 'a>(
