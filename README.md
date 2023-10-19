@@ -28,7 +28,9 @@ Run the Seaso executor, feeding in your source code as standard input. For examp
 
 Once the Seaso executor has consumed all standard input, it will parse and check if your Seaso program is well-formed, and if so, will compute and output its denotation.
 The denotation consists of three sets of atoms: _truths_, _unknowns_, and _emissions_.
-Always, truths and unknowns are disjoint, and truths are a superset of emissions.
+Always, truths and unknowns are disjoint, and truths are a superset of emissions. 
+Intuitively, unknowns "contain contradictory facts" and emissions "highlight important truths".
+
 Here is an example output resulting from the above usage.
 
 ```
@@ -72,3 +74,6 @@ For extra convenience, run with `cargo doc --no-deps --open` to open the docs in
 The repo can be used as a Rust dependency as usual (see `crates.io` for some examples).
 For example, you can build a software system that uses this repo to compute the denotation of Seaso programs stored in memory as ASTs (skipping parsing).
 
+## Language
+
+The Seaso language is being developed for the incremental modelling of complex, federated, data-exchange systems. Once ready, the associated paper will be referred to here for a complete language definition. In the meantime, inspect `./example_programs/features` for simple Seaso programs chosen to illustrate language features.
