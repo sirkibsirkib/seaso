@@ -79,7 +79,7 @@ For example, you can build a software system that uses this repo to compute the 
 The Seaso language is being developed for the incremental modelling of complex, federated, data-exchange systems. Once ready, the associated paper will be referred to here for a complete language definition. In the meantime, inspect `./example_programs/features` for simple Seaso programs chosen to illustrate language features.
 
 
-## Executability Tests
+## Executability of Examples Test
 
 Compile the library, run all tests, and show which pass/fail with the following:
 ```
@@ -87,3 +87,13 @@ cargo test --release -- --nocapture
 ```
 Note that this currently only tests whether the program was executable, i.e.,
 undeclared domains and broken seals do not prevent passing.
+
+If working as intended, you should see output beginning with the following:
+```
+running 1 test
+pass ./example_programs\features\ascription.seaso
+pass ./example_programs\features\asp_eg.seaso
+pass ./example_programs\features\conjunctive_consequents.seaso
+pass ./example_programs\features\constants_as_primitives.seaso
+pass ./example_programs\features\count.seaso
+```
