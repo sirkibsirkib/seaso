@@ -1,0 +1,8 @@
+# a breaks b's seal on int because b is not transitively used by b.
+
+part a {
+	rule 1.
+}
+part b {
+	seal int.
+}
