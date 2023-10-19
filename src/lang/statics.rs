@@ -6,9 +6,9 @@ use std::{
     sync::OnceLock,
 };
 
-pub struct PartMap<'a> {
-    map: HashMap<&'a PartName, &'a Part>,
-}
+// pub struct PartMap<'a> {
+//     map: HashMap<&'a PartName, &'a Part>,
+// }
 
 pub type PartUsageGraph<'a> = crate::util::Digraph<&'a PartName>;
 pub type ArgumentGraph<'a> = crate::util::Digraph<&'a DomainId>;
@@ -23,6 +23,7 @@ pub struct SealBreak<'a> {
 
 #[derive(Debug)]
 pub enum ExecutableRuleError {
+    RepeatedlyDefinedPart { part_name: PartName },
     OneVariableTwoTypes { vid: VariableId, domains: [DomainId; 2] },
     MistypedArgument { constructor: DomainId, expected: DomainId, got: DomainId },
     VariableNotEnumerable(VariableId),
@@ -32,9 +33,9 @@ pub enum ExecutableRuleError {
 
 #[derive(Debug)]
 pub enum ExecutableError<'a> {
-    ConflictingDefinitions { part_name: &'a PartName, did: DomainId, params: [Vec<DomainId>; 2] },
-    DefiningPrimitive { part_name: &'a PartName, did: DomainId, params: &'a [DomainId] },
-    ExecutableRuleError { part_name: &'a PartName, rule: &'a Rule, err: ExecutableRuleError },
+    ConflictingDefinitions { statement_at: StatementAt, did: DomainId, params: [Vec<DomainId>; 2] },
+    DefiningPrimitive { statement_at: StatementAt, did: DomainId, params: &'a [DomainId] },
+    ExecutableRuleError { statement_at: StatementAt, rule: &'a Rule, err: ExecutableRuleError },
 }
 
 //////////////////
@@ -45,19 +46,34 @@ impl Program {
         self.parts.extend(other.parts.into_iter());
         self
     }
-}
-
-impl<'a> PartMap<'a> {
-    pub fn new(parts: impl IntoIterator<Item = &'a Part>) -> Result<Self, &'a PartName> {
-        let map = util::collect_map_lossless(parts.into_iter().map(|part| (&part.name, part)));
-        map.map(|map| Self { map })
+    fn statements_and_at(&self) -> impl Iterator<Item = (&Statement, StatementAt)> {
+        let part_statements = self.parts.iter().flat_map(|part| {
+            part.statements
+                .iter()
+                .zip(std::iter::repeat(StatementAt::InPart { part_name: part.name.clone() }))
+        });
+        let anon_mod_statements =
+            self.anon_mod_statements.iter().enumerate().map(|(statement_index, statement)| {
+                (statement, StatementAt::AnonPart { statement_index })
+            });
+        part_statements.chain(anon_mod_statements)
+    }
+    pub fn repeatedly_defined_part(&self) -> Option<&PartName> {
+        let mut seen_so_far = HashSet::<&PartName>::default();
+        for part in self.parts.iter() {
+            let name = &part.name;
+            if !seen_so_far.insert(name) {
+                return Some(name);
+            }
+        }
+        None
     }
     pub fn part_usage_graph(&self) -> PartUsageGraph {
-        let mut edges = HashSet::<[&'a PartName; 2]>::default();
-        for (&x, part) in &self.map {
-            for y in part.uses.iter() {
-                if x != y {
-                    edges.insert([x, y]);
+        let mut edges = HashSet::<[&PartName; 2]>::default();
+        for x in self.parts.iter() {
+            for y in self.parts.iter() {
+                if x.name != y.name {
+                    edges.insert([&x.name, &y.name]);
                 }
             }
         }
@@ -66,22 +82,171 @@ impl<'a> PartMap<'a> {
         digraph
     }
     pub fn depended_undefined_names(&self) -> impl Iterator<Item = &PartName> {
-        self.depended_parts().filter(|name| !self.map.contains_key(name))
+        let defined: HashSet<_> = self.parts.iter().map(|part| &part.name).collect();
+        self.parts
+            .iter()
+            .flat_map(|part| part.uses.iter())
+            .filter(move |part_name| defined.contains(part_name))
     }
     pub fn depended_parts(&self) -> impl Iterator<Item = &PartName> {
-        self.map.values().flat_map(|part| part.uses.iter())
+        self.parts.iter().flat_map(|part| part.uses.iter())
+    }
+
+    pub fn executable(
+        &self,
+        executable_config: ExecutableConfig,
+    ) -> Result<ExecutableProgram, ExecutableError> {
+        // pass 1: collect domain definitions
+        let dd = {
+            let mut dd = DomainDefinitions::default();
+            for (statement, statement_at) in self.statements_and_at() {
+                if let Statement::Defn { did, params } = statement {
+                    if did.is_primitive() {
+                        return Err(ExecutableError::DefiningPrimitive {
+                            statement_at: statement_at.clone(),
+                            did: did.clone(),
+                            params,
+                        });
+                    }
+                    let prev = dd.insert(did.clone(), params.clone());
+                    if let Some(previous_params) = prev {
+                        if &previous_params != params {
+                            return Err(ExecutableError::ConflictingDefinitions {
+                                statement_at,
+                                did: did.clone(),
+                                params: [previous_params, params.clone()],
+                            });
+                        }
+                    }
+                }
+            }
+            dd
+        };
+
+        // pass 2: extract annotated rules from statements. collect usages, sealers, modifiers, ...
+        let mut annotated_rules = vec![];
+        let mut sealers_modifiers = HashMap::<DomainId, DomainSealersModifiers>::default();
+        let mut emissive = HashSet::<DomainId>::default();
+        let mut declared = HashSet::<DomainId>::default();
+        let mut used = HashSet::<DomainId>::default();
+
+        for (statement, statement_at) in self.statements_and_at() {
+            match statement {
+                Statement::Rule(rule) => {
+                    rule.used_dids(&mut used);
+                    let v2d = rule.rule_type_variables(&dd).map_err(|err| {
+                        ExecutableError::ExecutableRuleError {
+                            statement_at: statement_at.clone(),
+                            rule,
+                            err,
+                        }
+                    })?;
+
+                    let mut handle_consequent = |ra: &RuleAtom| {
+                        if !rule.contains_pos_antecedent(ra, executable_config.subconsequence) {
+                            let did = ra.domain_id(&v2d).expect("WAH");
+                            sealers_modifiers
+                                .entry(did.clone())
+                                .or_default()
+                                .modifiers
+                                .insert(statement_at.clone());
+                        }
+                    };
+                    for consequent in &rule.consequents {
+                        if executable_config.subconsequence {
+                            // sub-conseuquents are treated as consequents
+                            consequent.visit_subatoms(&mut handle_consequent);
+                        } else {
+                            handle_consequent(consequent)
+                        }
+                    }
+
+                    annotated_rules.push(AnnotatedRule {
+                        v2d,
+                        rule: rule.clone().variable_ascriptions_cleared(),
+                    })
+                }
+                Statement::Emit(did) => {
+                    used.insert(did.clone());
+                    emissive.insert(did.clone());
+                }
+                Statement::Seal(did) => {
+                    used.insert(did.clone());
+                    sealers_modifiers.entry(did.clone()).or_default().sealers.insert(statement_at);
+                }
+                Statement::Decl(vec) => {
+                    for did in vec {
+                        declared.insert(did.clone());
+                    }
+                }
+                Statement::Defn { params, did } => {
+                    // did a definition pass earlier
+                    declared.insert(did.clone());
+                    for param in params {
+                        used.insert(param.clone());
+                    }
+                }
+            }
+        }
+
+        let used_undeclared: HashSet<_> =
+            used.into_iter().filter(|did| !declared.contains(did) && !did.is_primitive()).collect();
+        let declared_undefined = declared.into_iter().filter(|did| !dd.contains_key(did)).collect();
+        Ok(ExecutableProgram {
+            dd,
+            annotated_rules,
+            emissive,
+            sealers_modifiers,
+            declared_undefined,
+            used_undeclared,
+            executable_config,
+        })
     }
 }
 
+// impl<'a> PartMap<'a> {
+//     pub fn new(parts: impl IntoIterator<Item = &'a Part>) -> Result<Self, &'a PartName> {
+//         let map = util::collect_map_lossless(parts.into_iter().map(|part| (&part.name, part)));
+//         map.map(|map| Self { map })
+//     }
+//     pub fn part_usage_graph(&self) -> PartUsageGraph {
+//         let mut edges = HashSet::<[&'a PartName; 2]>::default();
+//         for (&x, part) in &self.map {
+//             for y in part.uses.iter() {
+//                 if x != y {
+//                     edges.insert([x, y]);
+//                 }
+//             }
+//         }
+//         let mut digraph = PartUsageGraph::default();
+//         digraph.transitively_close();
+//         digraph
+//     }
+//     pub fn depended_undefined_names(&self) -> impl Iterator<Item = &PartName> {
+//         self.depended_parts().filter(|name| !self.map.contains_key(name))
+//     }
+//     pub fn depended_parts(&self) -> impl Iterator<Item = &PartName> {
+//         self.map.values().flat_map(|part| part.uses.iter())
+//     }
+// }
+
 impl<'a> PartUsageGraph<'a> {
     fn would_break(&self, sealer: &StatementAt, modifier: &StatementAt) -> bool {
-        if sealer.part_name.0 == "" && modifier.part_name.0 == "" {
-            // special case! statement order matters!
-            return sealer.statement_index < modifier.statement_index;
+        use StatementAt::{AnonPart, InPart};
+        match [sealer, modifier] {
+            [InPart { part_name: a }, InPart { part_name: b }] => {
+                a != b && !self.contains_edge(&[a, b])
+            }
+            [AnonPart { statement_index: a }, AnonPart { statement_index: b }] => a < b,
+            _ => true,
         }
-        // normal case. Based part usage graph
-        sealer.part_name != modifier.part_name
-            && !self.contains_edge(&[&sealer.part_name, &modifier.part_name])
+        // if sealer.part_name.0 == "" && modifier.part_name.0 == "" {
+        //     // special case! statement order matters!
+        //     return sealer.statement_index < modifier.statement_index;
+        // }
+        // // normal case. Based part usage graph
+        // sealer.part_name != modifier.part_name
+        //     && !self.contains_edge(&[&sealer.part_name, &modifier.part_name])
     }
 
     pub fn iter_breaks<'b: 'a>(
@@ -161,117 +326,6 @@ impl ExecutableProgram {
             }
         }
         None
-    }
-    pub fn new<'a>(
-        part_map: &'a PartMap<'a>,
-        executable_config: ExecutableConfig,
-    ) -> Result<Self, ExecutableError<'a>> {
-        // pass 1: collect domain definitions
-        let dd = {
-            let mut dd = DomainDefinitions::default();
-            for (&part_name, part) in part_map.map.iter() {
-                for statement in part.statements.iter() {
-                    if let Statement::Defn { did, params } = statement {
-                        if did.is_primitive() {
-                            return Err(ExecutableError::DefiningPrimitive {
-                                part_name,
-                                did: did.clone(),
-                                params,
-                            });
-                        }
-                        let prev = dd.insert(did.clone(), params.clone());
-                        if let Some(previous_params) = prev {
-                            if &previous_params != params {
-                                return Err(ExecutableError::ConflictingDefinitions {
-                                    part_name,
-                                    did: did.clone(),
-                                    params: [previous_params, params.clone()],
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-            dd
-        };
-
-        // pass 2: extract annotated rules from statements. collect usages, sealers, modifiers, ...
-        let mut annotated_rules = vec![];
-        let mut sealers_modifiers = HashMap::<DomainId, DomainSealersModifiers>::default();
-        let mut emissive = HashSet::<DomainId>::default();
-        let mut declared = HashSet::<DomainId>::default();
-        let mut used = HashSet::<DomainId>::default();
-        for (&part_name, part) in part_map.map.iter() {
-            for (statement_index, statement) in part.statements.iter().enumerate() {
-                match statement {
-                    Statement::Rule(rule) => {
-                        rule.used_dids(&mut used);
-                        let v2d = rule.rule_type_variables(&dd).map_err(|err| {
-                            ExecutableError::ExecutableRuleError { part_name, rule, err }
-                        })?;
-
-                        let mut handle_consequent = |ra: &RuleAtom| {
-                            if !rule.contains_pos_antecedent(ra, executable_config.subconsequence) {
-                                let did = ra.domain_id(&v2d).expect("WAH");
-                                sealers_modifiers.entry(did.clone()).or_default().modifiers.insert(
-                                    StatementAt { part_name: part_name.clone(), statement_index },
-                                );
-                            }
-                        };
-                        for consequent in &rule.consequents {
-                            if executable_config.subconsequence {
-                                // sub-conseuquents are treated as consequents
-                                consequent.visit_subatoms(&mut handle_consequent);
-                            } else {
-                                handle_consequent(consequent)
-                            }
-                        }
-
-                        annotated_rules.push(AnnotatedRule {
-                            v2d,
-                            rule: rule.clone().variable_ascriptions_cleared(),
-                        })
-                    }
-                    Statement::Emit(did) => {
-                        used.insert(did.clone());
-                        emissive.insert(did.clone());
-                    }
-                    Statement::Seal(did) => {
-                        used.insert(did.clone());
-                        sealers_modifiers
-                            .entry(did.clone())
-                            .or_default()
-                            .sealers
-                            .insert(StatementAt { part_name: part_name.clone(), statement_index });
-                    }
-                    Statement::Decl(vec) => {
-                        for did in vec {
-                            declared.insert(did.clone());
-                        }
-                    }
-                    Statement::Defn { params, did } => {
-                        // did a definition pass earlier
-                        declared.insert(did.clone());
-                        for param in params {
-                            used.insert(param.clone());
-                        }
-                    }
-                }
-            }
-        }
-
-        let used_undeclared: HashSet<_> =
-            used.into_iter().filter(|did| !declared.contains(did) && !did.is_primitive()).collect();
-        let declared_undefined = declared.into_iter().filter(|did| !dd.contains_key(did)).collect();
-        Ok(ExecutableProgram {
-            dd,
-            annotated_rules,
-            emissive,
-            sealers_modifiers,
-            declared_undefined,
-            used_undeclared,
-            executable_config,
-        })
     }
 }
 

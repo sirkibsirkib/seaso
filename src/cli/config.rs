@@ -1,14 +1,13 @@
 use crate::lang::ExecutableConfig;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 pub struct Config {
-    defined_flag_name_to_description: HashMap<&'static str, &'static str>,
-    present_flag_names: HashSet<String>,
+    pub present_flag_names: HashSet<String>,
 }
 
 impl Config {
     pub fn test(&self, flag_name: &'static str) -> bool {
-        if !self.defined_flag_name_to_description.contains_key(flag_name) {
+        if !Self::known_flag_name(flag_name) {
             panic!("unknown flag name! `{}`", flag_name);
         }
         self.present_flag_names.contains(flag_name)
@@ -29,8 +28,15 @@ static FLAG_DESC_SLICE: &[(&str, &str)] = &[
     ("save", "preprocess rules s.t. they are safe by adding consequent-only variables as positive antecedents"),
     ("sub", "rules implicitly infer all consequents' subconsequents"),
 ];
-impl Default for Config {
-    fn default() -> Self {
+
+impl Config {
+    pub fn known_flag_name(s: &str) -> bool {
+        FLAG_DESC_SLICE.iter().any(|(key, _)| key == &s)
+    }
+    pub fn no_flags() -> Self {
+        Self { present_flag_names: Default::default() }
+    }
+    pub fn from_sys_args() -> Self {
         if std::env::args().find(|s| s == "--help").is_some() {
             println!("Seaso executor help information. Flags:");
             println!(" --{: <9}  {}", "help", "print this");
@@ -39,8 +45,8 @@ impl Default for Config {
             }
             std::process::exit(0);
         }
-        let defined_flag_name_to_description: HashMap<_, _> =
-            FLAG_DESC_SLICE.into_iter().copied().collect();
+        // let defined_flag_name_to_description: HashMap<_, _> =
+        //     FLAG_DESC_SLICE.into_iter().copied().collect();
         let present_flag_names = std::env::args()
             .skip(1)
             .filter_map(|mut s| {
@@ -48,7 +54,7 @@ impl Default for Config {
                     None
                 } else if s.starts_with("--") {
                     s.replace_range(0.."--".len(), "");
-                    if !defined_flag_name_to_description.contains_key(s.as_str()) {
+                    if !Self::known_flag_name(&s) {
                         println!("~ ~ WARNING: unrecognized flag  `{}` ~ ~", s);
                     }
                     Some(s)
@@ -58,7 +64,7 @@ impl Default for Config {
                 }
             })
             .collect();
-        Self { present_flag_names, defined_flag_name_to_description }
+        Self { present_flag_names }
     }
 }
 

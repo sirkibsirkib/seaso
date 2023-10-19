@@ -111,9 +111,9 @@ pub struct AnnotatedRule {
 pub struct PartName(pub String);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct StatementAt {
-    part_name: PartName,
-    statement_index: usize,
+pub enum StatementAt {
+    InPart { part_name: PartName },
+    AnonPart { statement_index: usize },
 }
 
 #[derive(Debug, Default)]

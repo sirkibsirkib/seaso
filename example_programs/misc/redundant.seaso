@@ -1,14 +1,14 @@
 defn friend(person,person). person(str). cool(person). friended(person).
 defn friendless(person). eq(person,person). unfriend(person,person).
 emit friendless.
-rule friend(X,X).
-     friend(X,Y) :- cool(Y).
+rule friend(X,X) :- X.
+     friend(X,Y) :- cool(Y), X.
      friend(X,Z) :- friend(X,Y), cool(Y), friend(Y,Z).
      cool(X) :- friend(Y,X), friend(Z,X), !eq(X,Y), !eq(Y,Z), !eq(X,Z).
      friended(Q) :- friend(P,Q), !eq(P,Q).
-     friendless(P) :- !friended(P).
-     unfriend(X,Y) :- !friend(X,Y).
-     eq(X,X).
+     friendless(P) :- P, !friended(P).
+     unfriend(X,Y) :- X, Y, !friend(X,Y).
+     eq(X,X) :- X.
 
 rule friend(person("bob"),person("amy")).
 rule friend(person("cam"),person("amy")).

@@ -77,3 +77,13 @@ For example, you can build a software system that uses this repo to compute the 
 ## Language
 
 The Seaso language is being developed for the incremental modelling of complex, federated, data-exchange systems. Once ready, the associated paper will be referred to here for a complete language definition. In the meantime, inspect `./example_programs/features` for simple Seaso programs chosen to illustrate language features.
+
+
+## Executability Tests
+
+Compile the library, run all tests, and show which pass/fail with the following.
+Note that this currently only tests whether the program was executable, i.e.,
+undeclared domains and broken seals do not prevent passing.
+```
+cargo test --release -- --nocapture
+```
