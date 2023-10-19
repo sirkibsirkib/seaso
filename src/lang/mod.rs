@@ -21,6 +21,19 @@ use std::collections::{HashMap, HashSet};
 
 /////////////////////////////////////////////
 
+#[derive(Debug)]
+pub struct Program {
+    pub anon_mod_statements: Vec<Statement>,
+    pub parts: VecSet<Part>,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct Part {
+    pub name: PartName,
+    pub uses: VecSet<PartName>,
+    pub statements: VecSet<Statement>,
+}
+
 /// Used (internally) to remember where and how constructors are defined.
 pub type DomainDefinitions = HashMap<DomainId, Vec<DomainId>>;
 

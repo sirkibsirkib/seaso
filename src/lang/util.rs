@@ -110,10 +110,17 @@ impl<T: Ord> Default for VecSet<T> {
         Self { elements: vec![] }
     }
 }
-impl<'a, T: Ord> IntoIterator for VecSet<T> {
+// impl<'a, T: Ord> IntoIterator for VecSetMutGuard<'a, T> {
+//     type Item = &'a mut T;
+//     type IntoIter = std::slice::IterMut<'a, T>;
+//     fn into_iter(self) -> Self::IntoIter {
+//         self.set.elements.as_mut_slice().into_iter()
+//     }
+// }
+impl<T: Ord> IntoIterator for VecSet<T> {
     type Item = T;
-    type IntoIter = std::vec::IntoIter<T>;
-    fn into_iter(self) -> Self::IntoIter {
+    type IntoIter = <Vec<T> as IntoIterator>::IntoIter;
+    fn into_iter(self) -> std::vec::IntoIter<T> {
         self.elements.into_iter()
     }
 }
@@ -122,6 +129,11 @@ impl<T: Ord> VecSet<T> {
         elements.sort();
         elements.dedup();
         Self { elements }
+    }
+    pub fn extend(&mut self, elements: impl IntoIterator<Item = T>) {
+        for x in elements {
+            self.insert(x);
+        }
     }
     pub fn insert(&mut self, t: T) -> Option<T> {
         match self.elements.binary_search(&t) {

@@ -1,4 +1,3 @@
-use crate::lang::VecSet;
 use crate::*;
 use core::hash::Hash;
 
@@ -9,13 +8,6 @@ use std::{
 
 pub struct PartMap<'a> {
     map: HashMap<&'a PartName, &'a Part>,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct Part {
-    pub name: PartName,
-    pub uses: VecSet<PartName>,
-    pub statements: Vec<Statement>,
 }
 
 pub type PartUsageGraph<'a> = crate::util::Digraph<&'a PartName>;
@@ -46,6 +38,14 @@ pub enum ExecutableError<'a> {
 }
 
 //////////////////
+
+impl Program {
+    pub fn composed(mut self, other: Self) -> Self {
+        self.anon_mod_statements.extend(other.anon_mod_statements);
+        self.parts.extend(other.parts.into_iter());
+        self
+    }
+}
 
 impl<'a> PartMap<'a> {
     pub fn new(parts: impl IntoIterator<Item = &'a Part>) -> Result<Self, &'a PartName> {

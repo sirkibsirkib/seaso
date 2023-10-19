@@ -1,5 +1,5 @@
 use crate::lang::VecSet;
-use crate::{statics::Part, *};
+use crate::*;
 use core::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
@@ -18,9 +18,11 @@ pub struct EquatePrimitivesError<'a> {
 
 ////////////////
 
-pub fn add_antecedent_variables_as_pos_literals(parts: &mut [Part]) {
-    for part in parts {
-        for statement in part.statements.iter_mut() {
+pub fn add_antecedent_variables_as_pos_literals(program: &mut Program) {
+    let mut guard = program.parts.as_vec_mut();
+    for part in guard.as_mut() {
+        let mut guard = part.statements.as_vec_mut();
+        for statement in guard.as_mut() {
             if let Statement::Rule(rule) = statement {
                 let consequent_vids = rule.consequent_variables();
                 for vid in consequent_vids {
@@ -36,9 +38,11 @@ pub fn add_antecedent_variables_as_pos_literals(parts: &mut [Part]) {
     }
 }
 
-pub fn normalize_domain_id_formatting(parts: &mut [Part], localize: bool) {
-    for part in parts {
-        for statement in part.statements.iter_mut() {
+pub fn normalize_domain_id_formatting(program: &mut Program, localize: bool) {
+    let mut guard = program.parts.as_vec_mut();
+    for part in guard.as_mut() {
+        let mut guard = part.statements.as_vec_mut();
+        for statement in guard.as_mut() {
             let mut clos = |did: &mut DomainId| {
                 if did.is_primitive() {
                     return;
@@ -116,9 +120,11 @@ impl<'a> EqDomainIdGraph<'a> {
     }
 }
 
-pub fn deanonymize_variables(parts: &mut [Part]) {
-    for part in parts {
-        for statement in part.statements.iter_mut() {
+pub fn deanonymize_variables(program: &mut Program) {
+    let mut guard = program.parts.as_vec_mut();
+    for part in guard.as_mut() {
+        let mut guard = part.statements.as_vec_mut();
+        for statement in guard.as_mut() {
             if let Statement::Rule(r) = statement {
                 let mut next_idx = 0;
                 let mut clos = |vid: &mut VariableId| {
@@ -227,9 +233,9 @@ pub fn comments_removed(mut s: String) -> String {
 }
 
 impl EqClasses {
-    pub fn new(parts: &[Part]) -> Self {
+    pub fn new(program: &Program) -> Self {
         let mut graph = EqDomainIdGraph::default();
-        for part in parts {
+        for part in program.parts.iter() {
             for statement in part.statements.iter() {
                 if let Statement::Decl(vec) = statement {
                     for slice in vec.windows(2) {
@@ -244,9 +250,11 @@ impl EqClasses {
         }
         graph.to_equivalence_classes()
     }
-    pub fn normalize_equal_domain_ids(&self, parts: &mut [Part]) {
-        for part in parts.iter_mut() {
-            for statement in part.statements.iter_mut() {
+    pub fn normalize_equal_domain_ids(&self, program: &mut Program) {
+        let mut guard = program.parts.as_vec_mut();
+        for part in guard.as_mut() {
+            let mut guard = part.statements.as_vec_mut();
+            for statement in guard.as_mut() {
                 let mut clos = |did: &mut DomainId| {
                     if let Some(representative) = self.get_representative(did) {
                         if representative != did {

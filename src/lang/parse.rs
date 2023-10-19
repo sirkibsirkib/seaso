@@ -1,5 +1,5 @@
 use crate::lang::VecSet;
-use crate::{statics::Part, *};
+use crate::*;
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -57,9 +57,9 @@ where
 
 ////////////////////////////
 
-pub fn parts_and_statements(mut i: &str) -> IResult<&str, Vec<Part>> {
+pub fn program(mut i: &str) -> IResult<&str, Program> {
     let mut anon_mod_statements = Vec::<Statement>::default();
-    let mut parts = vec![];
+    let mut parts = VecSet::default();
     loop {
         if let Ok((i2, ss)) = statements1(i) {
             for s in ss {
@@ -67,16 +67,10 @@ pub fn parts_and_statements(mut i: &str) -> IResult<&str, Vec<Part>> {
             }
             i = i2;
         } else if let Ok((i2, m)) = part(i) {
-            parts.push(m);
+            parts.insert(m);
             i = i2;
         } else {
-            let anon_part = Part {
-                name: PartName("".into()),
-                uses: Default::default(),
-                statements: anon_mod_statements,
-            };
-            parts.push(anon_part);
-            return Ok((i, parts));
+            return Ok((i, Program { anon_mod_statements, parts }));
         };
     }
 }
@@ -89,7 +83,7 @@ pub fn part(i: &str) -> IResult<&str, Part> {
     nommap(p, |(name, maybe_uses, statements)| Part {
         name,
         uses: VecSet::from_vec(maybe_uses.unwrap_or_default()),
-        statements,
+        statements: VecSet::from_vec(statements),
     })(i)
 }
 pub fn like_statements(i: &str) -> IResult<&str, Vec<Statement>> {
