@@ -1,0 +1,63 @@
+
+part agents {
+    decl agent. key.
+    defn pub_key(agent,key).
+}
+
+part messages {
+    decl message. signature.
+    defn signed_message(agent,message,signature).
+    defn valid_signed_message(signed_message).
+}
+
+part message_dep {
+    defn message_includes(message,message).
+    defn message_excludes(message,message).
+}
+
+part signatures_identify_messages {
+    defn message_id(message,message).
+    defn signature_identifies_two(signature,message,message).
+    rule signature_identifies_two(S,M1,M2) :- message_id(M1,M2),
+            signed_message(_,M1,S), signed_message(_,M2,S).
+    rule message_id(M,M) :- M.
+    emit signature_identifies_two.
+    seal message_id. signature_identifies_two.
+}
+
+part actions {
+    decl action = atom.
+    defn did(agent,action).
+}
+
+part programs {
+    decl program.
+    defn truth(program,atom).
+}
+
+did(agent,action). signedMessage(author,message,signature).
+
+defn valid()
+
+
+part some_pub_key {
+    defn has_pub_key(agent). no_pub_key(agent).
+    rule has_pub_key(A) :- pub_key(A,_).
+    rule no_pub_key(A) :- A, !has_pub_key(A).
+    emit no_pub_key.
+    seal no_pub_key.
+}
+
+part unique_pub_key {
+    defn id(agent,agent).
+    rule id(A,A) :- A.
+
+    defn two_agents_one_pub_key(agent,agent,key).
+    rule two_agents_one_pub_key(A1,A2,K) :- pub_key(A1,K), pub_key(A2,K), !agent_eq(A1,A2).
+    emit two_agents_one_pub_key.
+    seal two_agents_one_pub_key. id.
+}
+
+rule no_pub_key(A) :- A
+
+seal agent. no_pub_key.
