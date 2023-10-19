@@ -81,9 +81,9 @@ The Seaso language is being developed for the incremental modelling of complex, 
 
 ## Executability Tests
 
-Compile the library, run all tests, and show which pass/fail with the following.
-Note that this currently only tests whether the program was executable, i.e.,
-undeclared domains and broken seals do not prevent passing.
+Compile the library, run all tests, and show which pass/fail with the following:
 ```
 cargo test --release -- --nocapture
 ```
+Note that this currently only tests whether the program was executable, i.e.,
+undeclared domains and broken seals do not prevent passing.
