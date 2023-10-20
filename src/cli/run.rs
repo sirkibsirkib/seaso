@@ -21,10 +21,17 @@ pub fn run_check(
     if config.test("source") {
         let _ = writeln!(w, "source after preprocessing: <<\n{}\n>>", &source);
     }
-    let mut parse_result = parse::program(&source);
+    let mut parse_result = parse::all_consuming(parse::program)(&source);
     let program = match &mut parse_result {
+        Err(nom::Err::Error(e)) => {
+            let x = nom::error::convert_error(source.as_str(), e.clone());
+            return Err(x);
+        }
         Err(e) => return Err(format!("parse error: {:#?}", e)),
-        Ok((_, program)) => program,
+        Ok((rest, program)) => {
+            assert!(rest.is_empty());
+            program
+        }
     };
     if let Some(part_name) = program.repeatedly_defined_part() {
         return Err(format!("~ ~ ERROR: repeatedly defined part name: {:?}", part_name));

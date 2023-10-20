@@ -8,8 +8,8 @@ use nom::{
     error::ParseError,
     multi::{many0, many0_count, many1, separated_list0},
     sequence::{delimited, pair, preceded, terminated, tuple},
-    IResult,
 };
+pub type IResult<I, O, E = nom::error::VerboseError<I>> = Result<(I, O), nom::Err<E>>;
 
 ////////// PARSER COMBINATORS //////////
 
@@ -55,24 +55,35 @@ where
     delimited(wstag("("), commasep(inner), wstag(")"))
 }
 
+pub fn all_consuming<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
+where
+    E: ParseError<&'a str>,
+    F: FnMut(&'a str) -> IResult<&'a str, O, E> + 'a,
+{
+    nom::combinator::all_consuming(wsr(inner))
+}
+
 ////////////////////////////
 
-pub fn program(mut i: &str) -> IResult<&str, Program> {
-    let mut anon_mod_statements = Vec::<Statement>::default();
-    let mut parts = VecSet::default();
-    loop {
-        if let Ok((i2, ss)) = statements1(i) {
-            for s in ss {
-                anon_mod_statements.push(s);
-            }
-            i = i2;
-        } else if let Ok((i2, m)) = part(i) {
-            parts.insert(m);
-            i = i2;
-        } else {
-            return Ok((i, Program { anon_mod_statements, parts }));
-        };
+pub fn program(i: &str) -> IResult<&str, Program> {
+    enum X {
+        Statements(Vec<Statement>),
+        Part(Part),
     }
+    let sta = nommap(statements1, X::Statements);
+    let par = nommap(part, X::Part);
+    let f = |xs: Vec<X>| {
+        let mut anon_mod_statements = Vec::<Statement>::default();
+        let mut parts = VecSet::default();
+        for x in xs {
+            match x {
+                X::Statements(s) => anon_mod_statements.extend(s),
+                X::Part(p) => drop(parts.insert(p)),
+            }
+        }
+        Program { anon_mod_statements, parts }
+    };
+    nommap(many0(alt((sta, par))), f)(i)
 }
 
 pub fn part(i: &str) -> IResult<&str, Part> {

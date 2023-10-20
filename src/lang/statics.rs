@@ -6,10 +6,6 @@ use std::{
     sync::OnceLock,
 };
 
-// pub struct PartMap<'a> {
-//     map: HashMap<&'a PartName, &'a Part>,
-// }
-
 pub type PartUsageGraph<'a> = crate::util::Digraph<&'a PartName>;
 pub type ArgumentGraph<'a> = crate::util::Digraph<&'a DomainId>;
 
@@ -41,6 +37,9 @@ pub enum ExecutableError<'a> {
 //////////////////
 
 impl Program {
+    // pub fn parse(source: &str) -> Result<Self, nom::Err<&str>> {
+    //     parse::completed(parse::program)(&source).map(|(x, y)| y)
+    // }
     pub fn composed(mut self, other: Self) -> Self {
         self.anon_mod_statements.extend(other.anon_mod_statements);
         self.parts.extend(other.parts.into_iter());
@@ -280,7 +279,7 @@ impl ExecutableProgram {
     pub fn is_sealed(&self, did: &DomainId) -> bool {
         self.sealers_modifiers.get(did).map(|dsm| !dsm.sealers.is_empty()).unwrap_or(false)
     }
-    pub fn unbounded_domain_cycle(&self) -> Option<DomainId> {
+    pub fn unbounded_domain_cycle(&self) -> Option<&DomainId> {
         // pass 3: (termination detection) build argument graph, throw error on cycle
         let mut ag = ArgumentGraph::default();
         for AnnotatedRule { rule, v2d } in self.annotated_rules.iter() {
@@ -289,7 +288,7 @@ impl ExecutableProgram {
         ag.transitively_close();
         for &did in ag.verts().iter() {
             if ag.contains_edge(&[did, did]) {
-                return Some(did.clone());
+                return Some(did);
             }
         }
         None
