@@ -1,4 +1,0 @@
-# No problems here. All used domains are declared. Order is irrelevant.
-
-defn friend(person,person).
-decl person.

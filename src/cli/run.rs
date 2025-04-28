@@ -40,7 +40,7 @@ pub fn run_check(
         let _ = writeln!(w, "ast before preprocessing: {:#?}", program);
     }
     preprocessing::normalize_domain_id_formatting(program, config.test("local"));
-    println!("{:#?}", program);
+    // println!("BEFORE EQ {:#?}", program);
     let eq_classes = EqClasses::new(program);
     if config.test("eq") {
         let _ = writeln!(
@@ -55,6 +55,7 @@ pub fn run_check(
         );
     }
     eq_classes.normalize_equal_domain_ids(program);
+    // println!("AFTER EQ {:#?}", program);
     if let Err(e) = eq_classes.check_primitives() {
         return Err(format!("domain equivalence class error: {:?}", e));
     }
@@ -92,6 +93,7 @@ pub fn run_check(
         );
     }
     let pug = program.part_usage_graph();
+    println!("{:#?}", pug);
     let seal_breaks = pug.iter_breaks(&ep).collect::<HashSet<_>>();
     if !seal_breaks.is_empty() {
         let _ = writeln!(w, "~ ~ WARNING: seal breaks: {:#?} ~ ~", seal_breaks);

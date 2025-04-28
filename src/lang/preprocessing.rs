@@ -253,20 +253,26 @@ impl EqClasses {
         }
         graph.to_equivalence_classes()
     }
+    pub fn normalize_equal_domain_ids_in(&self, statement: &mut Statement) {
+        let mut clos = |did: &mut DomainId| {
+            if let Some(representative) = self.get_representative(did) {
+                if representative != did {
+                    *did = representative.clone();
+                }
+            }
+        };
+        statement.visit_mut(&mut clos);
+    }
     pub fn normalize_equal_domain_ids(&self, program: &mut Program) {
         let mut guard = program.parts.as_vec_mut();
         for part in guard.as_mut() {
             let mut guard = part.statements.as_vec_mut();
             for statement in guard.as_mut() {
-                let mut clos = |did: &mut DomainId| {
-                    if let Some(representative) = self.get_representative(did) {
-                        if representative != did {
-                            *did = representative.clone();
-                        }
-                    }
-                };
-                statement.visit_mut(&mut clos);
+                self.normalize_equal_domain_ids_in(statement);
             }
+        }
+        for statement in program.anon_mod_statements.iter_mut() {
+            self.normalize_equal_domain_ids_in(statement);
         }
     }
     pub fn get_representative<'a, 'b>(&'a self, t: &'b DomainId) -> Option<&'a DomainId> {

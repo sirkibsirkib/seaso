@@ -68,15 +68,15 @@ impl Program {
         None
     }
     pub fn part_usage_graph(&self) -> PartUsageGraph {
-        let mut edges = HashSet::<[&PartName; 2]>::default();
+        let mut digraph = PartUsageGraph::default();
         for x in self.parts.iter() {
-            for y in self.parts.iter() {
-                if x.name != y.name {
-                    edges.insert([&x.name, &y.name]);
+            digraph.insert_vert(&x.name);
+            for y in x.uses.iter() {
+                if &x.name != y {
+                    digraph.insert_edge([&x.name, y]);
                 }
             }
         }
-        let mut digraph = PartUsageGraph::default();
         digraph.transitively_close();
         digraph
     }
@@ -201,7 +201,27 @@ impl Program {
             executable_config,
         })
     }
+
+    // pub fn every_mutation(&self) -> impl Iterator<Item = (&PartName, &DomainId)> {
+    //     self.parts.iter().flat_map(|part| (&part.name, part.state))
+    //     // for part in self.parts.iter() {
+    //     //     part.
+    //     // }
+    // }
 }
+
+// impl Statement {
+//     fn visit_every_mutation(&self, f: impl FnMut(&DomainId)) {
+//         match self {
+//             Statement::Rule(rule) => {
+//                 for c in rule.consequents.iter() {
+//                     match c {}
+//                 }
+//             }
+//             _ => {}
+//         }
+//     }
+// }
 
 impl<'a> PartUsageGraph<'a> {
     fn would_break(&self, sealer: &StatementAt, modifier: &StatementAt) -> bool {
@@ -559,9 +579,8 @@ impl std::fmt::Debug for Rule {
         util::CommaSep { iter: self.consequents.iter(), spaced: true }.fmt(f)?;
         if !self.antecedents.is_empty() {
             write!(f, " :- ")?;
-            util::CommaSep { iter: self.antecedents.iter(), spaced: true }.fmt(f)?;
         }
-        write!(f, ".")
+        util::CommaSep { iter: self.antecedents.iter(), spaced: true }.fmt(f)
     }
 }
 

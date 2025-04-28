@@ -1,4 +1,0 @@
-# statement at index 1 breaks the seal on int by the statement at index 0.
-
-seal int.
-rule 2.

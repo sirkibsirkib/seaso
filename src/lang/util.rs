@@ -41,9 +41,15 @@ impl<T: Ord> Digraph<T> {
         T: Clone + Hash + Eq,
     {
         for vert in edge.iter() {
-            self.verts.insert(vert.clone());
+            self.insert_vert(vert.clone());
         }
         self.edges.insert(edge);
+    }
+    pub fn insert_vert(&mut self, vert: T)
+    where
+        T: Clone + Hash + Eq,
+    {
+        self.verts.insert(vert.clone());
     }
 
     pub fn contains_edge(&self, edge: &[T; 2]) -> bool
@@ -198,7 +204,7 @@ impl Debug for RuleAtom {
             Self::Construct { did, args } => {
                 did.fmt(f)?;
                 if !args.is_empty() {
-                    CommaSep { iter: args, spaced: false }.fmt(f)?;
+                    write!(f, "({:?})", CommaSep { iter: args, spaced: false })?
                 }
                 Ok(())
             }
@@ -239,8 +245,7 @@ impl Debug for Statement {
             Statement::Defn { did, params } => {
                 write!(f, "defn {:?}({:?})", did, CommaSep { iter: params, spaced: false })
             }
-        }?;
-        write!(f, ". ")
+        }
     }
 }
 impl Debug for DomainId {

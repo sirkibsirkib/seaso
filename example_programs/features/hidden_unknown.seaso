@@ -1,7 +1,0 @@
-# This encodes a simplified version of the illustrative
-# examples from the well-founded semantics paper.
-# It shows some rules that (maybe unintuitively) give atoms unknown value.
-
-rule 1 :- !2, 3.
-     2 :- !1.
-     3.

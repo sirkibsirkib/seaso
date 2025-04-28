@@ -1,5 +1,0 @@
-# canonical example of a program with an atom of unknown value.
-# It is clear to see why both truth and falsity of p() would be contradictory.
-
-defn p().
-rule p() :- !p().

@@ -1,0 +1,7 @@
+# statement (decl X1 = X2 = X3 = ... Xn) unifies types {X1,X2,X3, ... ,Xn}. they become aliases of one another.
+
+decl user.
+defn person(str). knows(person,person). whitelisted(user).
+rule whitelisted(Y) :- knows(X,Y), whitelisted(X).
+
+decl user = person.

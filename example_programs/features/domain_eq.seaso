@@ -1,8 +1,0 @@
-# Demonstrates the unification of domains
-
-# First, let's define two domains separately.
-decl entity. seal entity.
-defn person(str). rule person("Amy").
-
-# Then, let's unify `entity` and `person`. Note that `entity`'s seal is broken.
-decl entity = person.

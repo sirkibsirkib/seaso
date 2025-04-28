@@ -1,3 +1,0 @@
-# smallest example of a defining and breaking a seal.
-
-part x {seal int. rule 0. }

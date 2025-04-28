@@ -1,4 +1,0 @@
-# defining parts.
-
-part a: b { decl x. }
-part b: a { decl y. }

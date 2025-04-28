@@ -1,3 +1,0 @@
-decl a. b.
-rule a(B) :- B:b.
-rule b(A) :- A:a.

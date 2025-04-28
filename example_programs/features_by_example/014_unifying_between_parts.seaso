@@ -1,0 +1,19 @@
+
+part a {
+    decl person.
+    defn cool(person).
+}
+
+part b {
+    rule cool(P) :- P.
+}
+
+part c {
+    defn user(str).
+    rule user("Bob").
+}
+
+part d {
+    decl user = person.
+    # bob is a cool person/user!
+}

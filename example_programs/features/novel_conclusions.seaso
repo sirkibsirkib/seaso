@@ -1,8 +1,0 @@
-# rule-consequents that are also positive antecedents ("conditions")
-# are clearly not "novel" inferences. They don't break seals.
-
-defn person(str).
-seal person.
-
-rule person(S) :- person(S).
-rule person("Amy") :- person("Amy").
