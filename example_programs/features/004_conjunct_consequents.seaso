@@ -1,0 +1,6 @@
+# Rule consequents and rule antecedents are conjunct.
+# Consequently, each rule with N conjuncts is equivalent to N rules with each conjunct.
+
+rule 1, 2 :- 3, 4.
+     3.
+     4.

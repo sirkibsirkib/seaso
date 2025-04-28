@@ -1,0 +1,5 @@
+# statement (decl X1 = X2 = X3 = ... Xn) unifies types {X1,X2,X3, ... ,Xn}. they become aliases of one another.
+
+defn f(a).
+decl a = int.
+rule f(2).

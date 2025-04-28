@@ -1,0 +1,10 @@
+# If statement A seals type T, and statement B is a rule with a T-type consequent,
+# then B _breaks the seal on T_ unless A _knows_ B.
+
+# For statements at the root of the program, _knows_ is the (expected) precedence relation.
+# The idea is that the author of the Nth statement knows all earlier statements, but not later statements.
+# In this example, seal int knows rule 1 but not rule 2, so only the latter breaks the seal on int!
+
+rule 1.
+seal int.
+rule 2.

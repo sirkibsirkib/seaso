@@ -1,0 +1,11 @@
+# truths are the consequences of applied rules.
+# falsities are the consequences of no applied rule.
+# unknowns have no determined truth or falsity because either:
+# - their truth depends requires breaking an arbitrary symmetry, or
+# - their falsity OR truth leads to inconsistencies
+
+defn true. false. mutex(int). inconsistent.
+rule true :- !false.
+    mutex(1) :- !mutex(2).
+    mutex(2) :- !mutex(1).
+    inconsistent :- !inconsistent.

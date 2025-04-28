@@ -1,0 +1,4 @@
+# you can define types with arguments, i.e., records.
+# there is no harm in cyclic dependencies.
+
+defn x. y(x). a(b). b(a,a).

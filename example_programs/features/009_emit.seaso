@@ -1,0 +1,9 @@
+# emissions are the subset of truths whose types are emissive.
+# they have a special interpretation: undesirable.
+
+defn event(str). bad(event).
+emit bad.
+
+rule event("saw some carrots").
+rule event("smelled the roses").
+rule bad(event("stubbed my toe")).

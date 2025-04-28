@@ -1,0 +1,25 @@
+# Statements within a part are all mutually related by _knows_ but, by default, do not know any other statements.
+# So "rule 1" does not break the seal on int, but "rule 2" and "rule 3" do.
+
+part a {
+    rule 1.
+}
+
+part b {
+    seal int.
+    rule 1.
+}
+
+rule 1.
+
+part y: x {}
+part x {
+    rule "hi".
+}
+part z: y {
+    seal x.
+}
+
+
+# "knows" is transitively asserted between statements of different parts explicitly in the declaration of the part.
+# Here, z knows y knows x, so rule "hi" does not break the seal on x in part z.

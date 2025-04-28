@@ -1,0 +1,15 @@
+# Each type T introduces a constructor for new terms, from terms of other types.
+# Each type T also introduces a valuation from T -> {true, false, unknown}.
+#   We say x is in the relation of T if x is true and x is in type T. 
+# It is important to realise that these are separate!
+
+defn cool(int). very_cool(cool).
+rule very_cool(cool(4)).
+
+# very_cool(cool(4)) is both the type and relation of "very_cool".
+# cool(4) is in the type, but NOT the relation of "cool"!
+
+# In general, subterms of true terms are not necessarily true!
+# But we can model this on a case-by-case basis with rules if we want.
+# Here, we could add "rule C :- very_cool(C)."
+

@@ -235,15 +235,18 @@ pub fn comments_removed(mut s: String) -> String {
 impl EqClasses {
     pub fn new(program: &Program) -> Self {
         let mut graph = EqDomainIdGraph::default();
-        for part in program.parts.iter() {
-            for statement in part.statements.iter() {
-                if let Statement::Decl(vec) = statement {
-                    for slice in vec.windows(2) {
-                        if let [a, b] = slice {
-                            graph.insert(a, b);
-                        } else {
-                            unreachable!()
-                        }
+        let iter = program
+            .parts
+            .iter()
+            .flat_map(|part| part.statements.iter())
+            .chain(program.anon_mod_statements.iter());
+        for statement in iter {
+            if let Statement::Decl(vec) = statement {
+                for slice in vec.windows(2) {
+                    if let [a, b] = slice {
+                        graph.insert(a, b);
+                    } else {
+                        unreachable!()
                     }
                 }
             }

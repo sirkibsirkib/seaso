@@ -1,0 +1,3 @@
+# you can declare nullary types x and y.
+
+defn x. y.

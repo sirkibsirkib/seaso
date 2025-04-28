@@ -1,0 +1,2 @@
+defn say(str). greeted.
+rule greeted :- say(Anything). say("Hello, world!").

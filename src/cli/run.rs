@@ -40,6 +40,7 @@ pub fn run_check(
         let _ = writeln!(w, "ast before preprocessing: {:#?}", program);
     }
     preprocessing::normalize_domain_id_formatting(program, config.test("local"));
+    println!("{:#?}", program);
     let eq_classes = EqClasses::new(program);
     if config.test("eq") {
         let _ = writeln!(
@@ -94,12 +95,6 @@ pub fn run_check(
     let seal_breaks = pug.iter_breaks(&ep).collect::<HashSet<_>>();
     if !seal_breaks.is_empty() {
         let _ = writeln!(w, "~ ~ WARNING: seal breaks: {:#?} ~ ~", seal_breaks);
-    }
-    if config.test("asp") {
-        let _ = writeln!(w, "asp print:\n{}", ep.asp_print());
-    }
-    if config.test("dot") {
-        let _ = writeln!(w, "ontology dot:\n{}", ep.ontology_dot());
     }
     let denotation_res = ep.denotation();
     if config.test("how") {

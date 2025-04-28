@@ -10,7 +10,7 @@ pub type PartUsageGraph<'a> = crate::util::Digraph<&'a PartName>;
 pub type ArgumentGraph<'a> = crate::util::Digraph<&'a DomainId>;
 
 /// Identifies which statements first seal and then modify which domain.
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Eq, Hash, PartialEq)]
 pub struct SealBreak<'a> {
     pub did: &'a DomainId,
     pub modifier: &'a StatementAt,
@@ -85,7 +85,7 @@ impl Program {
         self.parts
             .iter()
             .flat_map(|part| part.uses.iter())
-            .filter(move |part_name| defined.contains(part_name))
+            .filter(move |part_name| !defined.contains(part_name))
     }
     pub fn depended_parts(&self) -> impl Iterator<Item = &PartName> {
         self.parts.iter().flat_map(|part| part.uses.iter())
@@ -562,5 +562,28 @@ impl std::fmt::Debug for Rule {
             util::CommaSep { iter: self.antecedents.iter(), spaced: true }.fmt(f)?;
         }
         write!(f, ".")
+    }
+}
+
+impl std::fmt::Debug for SealBreak<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?} broke seal on {:?} in {:?}", self.modifier, self.did, self.sealer)
+    }
+}
+
+impl std::fmt::Debug for StatementAt {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            StatementAt::InPart { part_name } => part_name.fmt(f),
+            StatementAt::AnonPart { statement_index } => {
+                write!(f, "statement {:?}", statement_index)
+            }
+        }
+    }
+}
+
+impl std::fmt::Debug for PartName {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "part {:?}", self.0)
     }
 }

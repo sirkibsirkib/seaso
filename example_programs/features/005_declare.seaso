@@ -1,0 +1,6 @@
+# there is no problem defining variables of a type that is undefined if it is declared.
+# It stays opaque!
+
+decl x.
+defn y(x).
+rule y(X) :- X.

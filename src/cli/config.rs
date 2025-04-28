@@ -14,11 +14,9 @@ impl Config {
     }
 }
 static FLAG_DESC_SLICE: &[(&str, &str)] = &[
-    ("asp", "print Clingo-style answer set program solving for facts removing emissions"),
     ("ast1", "print abstract syntax tree before preprocessing"),
     ("ast2", "print abstract syntax tree after preprocessing"),
     ("cluster", "denotation atoms are shown clustered by domain"),
-    ("dot", "print GraphViz (.dot) graph ontology of defined domains"),
     ("eq", "print domain equivalence classes and their representative members"),
     ("how", "print the concrete rule antecedents of each truth"),
     ("ir", "print the internal representation (used to compute the denotation)"),

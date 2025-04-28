@@ -1,0 +1,13 @@
+# statements can be organised into parts.
+# each part introduces a local namespace. T@P is the type T local to part P, distinct from the same T elsewhere.
+# generally, where statements define terms has nothing to do with their own location.
+
+defn x@a(str).
+
+part a {
+    defn x(int).
+    rule x(2) :- x@a(String).
+}
+
+# However, when run with the "--local" flag, each T in part P without any explicit @P' has an implicit @P.
+# Consequently, parts can refer to each other, but cannot refer to definitions outside of any part.

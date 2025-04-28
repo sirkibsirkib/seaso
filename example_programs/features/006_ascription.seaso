@@ -1,0 +1,6 @@
+# Variables can be given explicit type ascriptions.
+# This is useful in a corner case such as in "X", whose type is not inferrable from any other term. 
+
+decl declared.
+defn flag. cool(flag).
+rule F :- cool(F:flag), X:declared.

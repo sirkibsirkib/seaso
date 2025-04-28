@@ -14,8 +14,6 @@ pub mod dynamics;
 
 pub mod util;
 
-mod extras;
-
 use crate::lang::util::VecSet;
 use std::collections::{HashMap, HashSet};
 
@@ -107,10 +105,10 @@ pub struct AnnotatedRule {
     pub rule: Rule,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct PartName(pub String);
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum StatementAt {
     InPart { part_name: PartName },
     AnonPart { statement_index: usize },
