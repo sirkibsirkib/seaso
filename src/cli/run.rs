@@ -79,6 +79,7 @@ pub fn run_check(
         Err(e) => return Err(format!("~ ~ ERROR: error constructing executable: {:#?}", e)),
         Ok(ep) => ep,
     };
+    // println!("EP {:#?}", ep);
     if let Some(cycle) = ep.unbounded_domain_cycle() {
         return Err(format!(
             "~ ~ ERROR: termination uncertain due to unbounded domain cycle: {:?} ~ ~",
@@ -93,7 +94,7 @@ pub fn run_check(
         );
     }
     let pug = program.part_usage_graph();
-    println!("{:#?}", pug);
+    // println!("{:#?}", pug);
     let seal_breaks = pug.iter_breaks(&ep).collect::<HashSet<_>>();
     if !seal_breaks.is_empty() {
         let _ = writeln!(w, "~ ~ WARNING: seal breaks: {:#?} ~ ~", seal_breaks);

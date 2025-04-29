@@ -11,7 +11,7 @@ part sec3_1_c: sec3_1_b {
     seal trusted. untrusted.
 }
 
-part sec3_1_d {
+part sec3_1_d: sec3_1_d {
     defn user(str). blacklisted(user). party(user).  
     rule party(U) :- U, !blacklisted(U). blacklisted(user("Dan")). seal party.
 }

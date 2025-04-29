@@ -4,6 +4,8 @@ defn has_email    (agreement,user).
   must_ask_purpose(agreement,user).
   needs_some      (agreement,user).
   badged          (agreement,user).
+
+
 defn asks(agreement,user,data,purpose).
   gives  (agreement,user,data,purpose).
   needs  (agreement,user,data,purpose).
@@ -24,4 +26,4 @@ rule has_email(A,U) :- user_email(A,U,E).
   , !must_ask_purpose(A,U)
   , !needs_some(A,U).
 seal needs_some. needs.
-same a = b.
+decl a = b.
