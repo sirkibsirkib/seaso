@@ -116,13 +116,7 @@ impl<T: Ord> Default for VecSet<T> {
         Self { elements: vec![] }
     }
 }
-// impl<'a, T: Ord> IntoIterator for VecSetMutGuard<'a, T> {
-//     type Item = &'a mut T;
-//     type IntoIter = std::slice::IterMut<'a, T>;
-//     fn into_iter(self) -> Self::IntoIter {
-//         self.set.elements.as_mut_slice().into_iter()
-//     }
-// }
+
 impl<T: Ord> IntoIterator for VecSet<T> {
     type Item = T;
     type IntoIter = <Vec<T> as IntoIterator>::IntoIter;

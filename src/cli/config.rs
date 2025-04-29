@@ -43,8 +43,6 @@ impl Config {
             }
             std::process::exit(0);
         }
-        // let defined_flag_name_to_description: HashMap<_, _> =
-        //     FLAG_DESC_SLICE.into_iter().copied().collect();
         let present_flag_names = std::env::args()
             .skip(1)
             .filter_map(|mut s| {

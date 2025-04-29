@@ -37,9 +37,6 @@ pub enum ExecutableError<'a> {
 //////////////////
 
 impl Program {
-    // pub fn parse(source: &str) -> Result<Self, nom::Err<&str>> {
-    //     parse::completed(parse::program)(&source).map(|(x, y)| y)
-    // }
     pub fn composed(mut self, other: Self) -> Self {
         self.anon_mod_statements.extend(other.anon_mod_statements);
         self.parts.extend(other.parts.into_iter());
@@ -190,38 +187,18 @@ impl Program {
 
         let used_undeclared: HashSet<_> =
             used.into_iter().filter(|did| !declared.contains(did) && !did.is_primitive()).collect();
-        let declared_undefined = declared.into_iter().filter(|did| !dd.contains_key(did)).collect();
+        // let declared_undefined = declared.into_iter().filter(|did| !dd.contains_key(did)).collect();
         Ok(ExecutableProgram {
-            dd,
+            // dd,
             annotated_rules,
             emissive,
             sealers_modifiers,
-            declared_undefined,
+            // declared_undefined,
             used_undeclared,
             executable_config,
         })
     }
-
-    // pub fn every_mutation(&self) -> impl Iterator<Item = (&PartName, &DomainId)> {
-    //     self.parts.iter().flat_map(|part| (&part.name, part.state))
-    //     // for part in self.parts.iter() {
-    //     //     part.
-    //     // }
-    // }
 }
-
-// impl Statement {
-//     fn visit_every_mutation(&self, f: impl FnMut(&DomainId)) {
-//         match self {
-//             Statement::Rule(rule) => {
-//                 for c in rule.consequents.iter() {
-//                     match c {}
-//                 }
-//             }
-//             _ => {}
-//         }
-//     }
-// }
 
 impl<'a> PartUsageGraph<'a> {
     fn would_break(&self, sealer: &StatementAt, modifier: &StatementAt) -> bool {
@@ -542,8 +519,6 @@ impl RuleAtom {
                         }
                     }
                 }
-                // let param_dids =
-                //     dd.get(did).ok_or(ExecutableRuleError::UndefinedConstructor(did.clone()))?;
 
                 for arg in args {
                     arg.type_variables(dd, vt)?

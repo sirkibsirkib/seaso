@@ -10,8 +10,6 @@ pub mod statics;
 /// Dynamics of Seaso, implementing methods and defining types needed to compute the denotation of a checked program.`
 pub mod dynamics;
 
-// pub mod search;
-
 pub mod util;
 
 use crate::lang::util::VecSet;
@@ -63,10 +61,6 @@ pub enum RuleAtom {
     Constant(Constant),
     Construct { did: DomainId, args: Vec<RuleAtom> },
 }
-
-// /// A sequence of statements.
-// #[derive(Debug, Default, Clone, Eq, PartialEq, Hash)]
-// pub struct Statements(pub Vec<Statement>);
 
 /// One of five kinds of statement.
 #[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -133,11 +127,11 @@ pub struct ExecutableConfig {
 
 #[derive(Debug)]
 pub struct ExecutableProgram {
-    pub(crate) dd: DomainDefinitions,
+    // pub(crate) dd: DomainDefinitions,
     pub(crate) annotated_rules: Vec<AnnotatedRule>,
     pub(crate) emissive: HashSet<DomainId>,
     pub(crate) sealers_modifiers: HashMap<DomainId, DomainSealersModifiers>,
-    pub(crate) declared_undefined: HashSet<DomainId>,
+    // pub(crate) declared_undefined: HashSet<DomainId>,
     pub(crate) used_undeclared: HashSet<DomainId>,
     pub(crate) executable_config: ExecutableConfig,
 }

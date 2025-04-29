@@ -1,9 +1,9 @@
-# Seaso Executor
+# Seaso Interpreter
 This contains the source code of the Seaso executor, which can be compiled to a standalone executable, or used as a Rust library.
 Seaso is a simple logic programming language.
 In a nutshell, each Seaso program prescribes
 In a nutshell, each Seaso program (1) models the facts of a system, (2) isolates logical inconsistencies as unknown facts, (2) prescribes which subset of true facts are undesirable, and (3) specifies how the program may be extended.
-Seaso's inference semantics implements the well-founded semantics [1], and the underlying design decisions are motivated by its application to data exchange systems.
+Seaso's inference semantics implements the well-founded semantics [1], and the underlying design decisions are motivated by its application to data exchange systems. The language is designed around the use of *seals* to control how programs are composed, to support incremental, multi-party development of specifications AKA cooperative specification [2]. 
 
 
 ## Executable
@@ -64,7 +64,7 @@ For example, you can build a software system that uses this repo to compute the 
 
 ## Language
 
-The Seaso language is being developed for the incremental modelling of complex, federated, data-exchange systems. Once ready, the associated paper will be referred to here for a complete language definition. In the meantime, inspect `./example_programs/features` for simple Seaso programs chosen to illustrate language features.
+The Seaso language is being developed for the incremental modelling of complex, federated, data-exchange systems. Once ready, the associated paper will be referred to here for a complete language definition. In the meantime, inspect `./example_programs/features_by_example` for simple Seaso programs chosen to illustrate language features.
 
 
 ## Executability of Examples Test
@@ -73,10 +73,9 @@ Compile the library, run all tests, and show which pass/fail with the following:
 ```
 cargo test --release -- --nocapture
 ```
-Note that this currently only tests whether the program was executable, i.e.,
-undeclared domains and broken seals do not prevent passing.
+Note that this tests whether the program was successfully parsed and executed. Success does not imply there are no warnings for use of undeclared domains or broken seals.
 
-If working as intended, you should see output beginning with the following:
+If working as intended, you should see the following output:
 ```
 running 1 test
 pass ./example_programs\features\ascription.seaso
@@ -120,4 +119,5 @@ test tests::examples ... ok
 
 ## References
 
-[1] Van Gelder, Allen, Kenneth A. Ross, and John S. Schlipf. "The well-founded semantics for general logic programs." Journal of the ACM (JACM) 38.3 (1991): 619-649.
+- [1] Van Gelder, Allen, Kenneth A. Ross, and John S. Schlipf. "The well-founded semantics for general logic programs." Journal of the ACM (JACM) 38.3 (1991): 619-649.
+- [2] Esterhuyse, Christopher A., and L. Thomas van Binsbergen. "Cooperative Specification via Composition Control." *Proceedings of the 17th ACM SIGPLAN International Conference on Software Language Engineering*. 2024.

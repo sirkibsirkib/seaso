@@ -6,3 +6,13 @@ edition = "2021"
 [dependencies]
 # parser combinators used in ./lang/parse.rs
 nom = "7" # last tested with 7.1.3
+
+
+
+[lib]
+name = "seaso"
+path = "src/lib.rs"
+
+[[bin]]
+name = "seaso"
+path = "src/main.rs"
